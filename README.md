@@ -7,24 +7,26 @@ Töötav VBA prototüüp MicroStation PowerDraft V8i 08.11.09.829 jaoks. Kasutaj
 3. Ava projekti VBA redaktor. Kui vana `ValiImport` moodul on juba olemas, eemalda see Project Exploreris paremklõpsuga **Remove ValiImport** (soovi korral ekspordi varukoopia). Vali **File → Import File** ja impordi uus `ValiImport.bas`. Ära jäta vana ja uut moodulit korraga projekti.
 4. Vali **Debug → Compile** ning salvesta projekt.
 5. Käivita makro `ValiImport.Import` (või sisesta `VBA RUN [ValiImport]ValiImport.Import`).
-6. Vali avanevas failidialoogis oma **TXT või CSV**. Failinimi võib olla suvaline. Kui `parnu_tm_mkm.cel` on samas kaustas, kasutatakse seda; muidu avaneb celliteegi valimise dialoog. Cancel katkestab ilma importimata.
+6. Vali avanevas failidialoogis oma **TXT või CSV**. Failinimi võib olla suvaline. Kui `kooditabel.csv` ja `parnu_tm_mkm.cel` on samas kaustas, kasutatakse neid; muidu avaneb vastava faili valimise dialoog. Cancel katkestab ilma importimata.
 7. Tee Fit View. Kontrolli celli suurust, asukohta ja leveleid.
 
-Oodatav tulemus: üks SPYMAR cell levelil ALUSVORK ning kaks eraldi kahepunktijoont levelil HOONE. Esimese celli asukoht joonisel: X=529317.082, Y=6470412.167, Z=3.801.
+Oodatav tulemus: üks SPYMAR cell levelil ALUSVORK, kaks eraldi kahepunktijoont levelil HOONE ning iga sisendpunkti juures mõõtepunkti ring ja punktinumber. Esimese celli asukoht joonisel: X=529317.082, Y=6470412.167, Z=3.801.
 
 ## Prototüübi reeglid
 
-- Sisend: `pnr,x,y,z,kood`. Päis on lubatud. Eraldajaks sobib koma, semikoolon või tabulaator. Semikooloni/tabulaatori puhul võib kümnendmärk olla koma. Toetatud on jutumärkides väljad ja Exceli `sep=;` algusrida.
+- Sisend: `pnr,x,y,z,kood`. Päis on lubatud. Esimene sisuline rida võib selle asemel sisaldada töö nime, kuupäeva või muud faili infot: kui see ei ole päis ega viieväljaline andmerida, jäetakse see vahele. Korrektne viieväljaline esimene punktirida imporditakse tavaliselt. Eraldajaks sobib koma, semikoolon või tabulaator. Semikooloni/tabulaatori puhul võib kümnendmärk olla koma. Toetatud on jutumärkides väljad ja Exceli `sep=;` algusrida.
 - Toetatud on UTF-8 (ka BOM-iga), BOM-iga UTF-16 ja lihtsad ASCII andmeread. Päise nimed peavad olema pnr, x, y, z, kood.
 - Algse näidisfaili `Selgitus:` rida lõpetab andmete lugemise; sellele järgnev selgitus ei ole imporditav andmestik. Muu vigane rida annab vea koos rea sisuga.
 - Faili X on põhi, Y ida. Joonise X saab faili Y; joonise Y saab faili X. Z säilib.
-- Kood 2: SPYMAR, ALUSVORK. Mõõtkordaja 1 ja pöördenurk 0; sobiv suurus tuleb joonisel kontrollida. Ka celli alamelemendid viiakse ALUSVORK levelile.
-- Koodid 6 ja 10: eraldi avatud linestring'id, HOONE. Esialgu tavaline joonekuju, aktiivse seadistuse joonesümboolikaga.
+- Iga sisendpunkti keskmesse luuakse täitmata ring läbimõõduga 0,2 m levelile `MOOTMPUNKT`. Punktinumber lisatakse 0,1 m kõrguse ja laiusega tekstina levelile `MOOTNR`, ringi keskmest 0,15 m paremale ja üles.
+- Koodide vastavused loetakse failist `kooditabel.csv`. Väljad on **Kood | Koodnimi | Tüüp | Leveli nimi | Joone/Celli nimi**; tüüp on `CELL` või `JOON`. `Koodnimi` on ainult informatiivne, võib olla tühi ja importija ignoreerib seda. Tabelis ei tohi olla korduvaid koode.
+- CELL-tüübi mõõtkordaja on 1 ja pöördenurk 0; sobiv suurus tuleb joonisel kontrollida. Ka celli alamelemendid viiakse tabelis määratud levelile.
+- JOON-tüübi kirjed loovad eraldi avatud linestring'id tabelis määratud levelile. „Joone/Celli nimi“ peab sisaldama MicroStationis kättesaadava joonestiili nime (näiteks `TEE`) või standardstiili numbrit 0–7. Stiiliobjekt määratakse otse elemendile, mitte ei võeta leveli ByLevel-stiilist.
 - Koodi muutus lõpetab joone. Tühje ridu eiratakse; need joont ei katkesta. Sama koodi hilisem uus grupp alustab uut joont.
 - Alla kahe punktiga joonegrupp, tundmatu kood või vigane andmerida katkestab impordi enne geomeetria lisamist.
 - Puuduv level luuakse. Programm seob celliteegi aktiivse sessiooniga.
 - Korduv käivitus lisab elemendid uuesti. Kasuta esmaseks kontrolliks tühja testjoonist.
-- Punktinumbreid ja kõrgustekste ei joonistata. Puudub kooditabeli kasutajaliides.
+- Kõrgustekste ei joonistata. Kooditabelit muudetakse CSV-failis; eraldi kasutajaliidest ei ole.
 
 VBA toe viide: https://bentleysystems.service-now.com/community?id=kb_article&sysparm_article=KB0109946
 
@@ -32,6 +34,4 @@ Failidialoog kasutab Windowsi Unicode API-t ja on mõeldud **32-bitisele PowerDr
 
 ## Järgmine etapp
 
-Kooditabeli väljad: **Kood | Koodnimi | Tüüp | Leveli nimi | Joone/Celli nimi**.
-
-Praegune moodul kasutab veel koodis määratud vastavusi (2, 6, 10). Eraldi kooditabeli lugemine ja muutmise kasutajaliides on järgmine arendusetapp. Celliteegi valitud asukoha salvestamine lisandub hiljem.
+Kooditabeli muutmise kasutajaliides ja celliteegi valitud asukoha salvestamine lisanduvad hiljem.
