@@ -1,0 +1,4 @@
+*.bas text eol=crlf
+*.csv text eol=crlf
+*.md text eol=lf
+*.cel binary

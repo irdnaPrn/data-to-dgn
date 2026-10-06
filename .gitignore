@@ -1,0 +1,5 @@
+*.mvba
+*.bak
+*.tmp
+*.log
+~$*
