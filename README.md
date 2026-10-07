@@ -19,14 +19,15 @@ Oodatav tulemus: üks SPYMAR cell levelil ALUSVORK, kaks eraldi kahepunktijoont 
 - Algse näidisfaili `Selgitus:` rida lõpetab andmete lugemise; sellele järgnev selgitus ei ole imporditav andmestik. Muu vigane rida annab vea koos rea sisuga.
 - Faili X on põhi, Y ida. Joonise X saab faili Y; joonise Y saab faili X. Z säilib.
 - Iga sisendpunkti keskmesse luuakse täitmata ring läbimõõduga 0,2 m levelile `MOOTMPUNKT`. Punktinumber lisatakse 0,1 m kõrguse ja laiusega tekstina levelile `MOOTNR`, ringi keskmest 0,15 m paremale ja üles.
-- Koodide vastavused loetakse failist `kooditabel.csv`. Väljad on **Kood | Koodnimi | Tüüp | Leveli nimi | Joone/Celli nimi**; tüüp on `CELL` või `JOON`. `Koodnimi` on ainult informatiivne, võib olla tühi ja importija ignoreerib seda. Tabelis ei tohi olla korduvaid koode.
-- CELL-tüübi mõõtkordaja on 1 ja pöördenurk 0; sobiv suurus tuleb joonisel kontrollida. Ka celli alamelemendid viiakse tabelis määratud levelile.
+- `RING02` celli puhul lisatakse kõrgus samale levelile ühe tekstina cellist paremale, näiteks `1.65`. Väärtusel on kaks komakohta ja punkt kümnenderaldajana. Teksti kõrgus on 0,85 m, laius 0,65 m ning font `ENGINEERING`.
+- Koodide vastavused loetakse failist `kooditabel.csv`. Väljad on **Kood | Koodnimi | Tüüp | Leveli nimi | Joone/Celli nimi | Skaala**; tüüp on `CELL` või `JOON`. `Koodnimi` on ainult informatiivne, võib olla tühi ja importija ignoreerib seda. Tabelis ei tohi olla korduvaid koode.
+- CELL-tüübi positiivne mõõtkordaja loetakse väljast `Skaala` ja rakendatakse X- ning Y-suunas; Z-suuna mõõtkordaja jääb 1. Pöördenurk on 0. JOON-tüübi puhul skaalat ei kasutata ja väli võib olla tühi. Ka celli alamelemendid viiakse tabelis määratud levelile.
 - JOON-tüübi kirjed loovad eraldi avatud linestring'id tabelis määratud levelile. „Joone/Celli nimi“ peab sisaldama MicroStationis kättesaadava joonestiili nime (näiteks `TEE`) või standardstiili numbrit 0–7. Stiiliobjekt määratakse otse elemendile, mitte ei võeta leveli ByLevel-stiilist.
 - Koodi muutus lõpetab joone. Tühje ridu eiratakse; need joont ei katkesta. Sama koodi hilisem uus grupp alustab uut joont.
-- Alla kahe punktiga joonegrupp, tundmatu kood või vigane andmerida katkestab impordi enne geomeetria lisamist.
+- Ühe punktiga JOON-kirjest joont ei looda, kuid selle mõõtepunkt ja punktinumber imporditakse. Vigane andmerida katkestab impordi enne geomeetria lisamist. Kooditabelist puuduva koodiga punktile luuakse ainult mõõtepunkt ja punktinumber; pärast importi kuvatakse puuduvate koodide koondhoiatus.
 - Puuduv level luuakse. Programm seob celliteegi aktiivse sessiooniga.
 - Korduv käivitus lisab elemendid uuesti. Kasuta esmaseks kontrolliks tühja testjoonist.
-- Kõrgustekste ei joonistata. Kooditabelit muudetakse CSV-failis; eraldi kasutajaliidest ei ole.
+- Kõrgustekst lisatakse ainult `RING02` cellile. Kooditabelit muudetakse CSV-failis; eraldi kasutajaliidest ei ole.
 
 VBA toe viide: https://bentleysystems.service-now.com/community?id=kb_article&sysparm_article=KB0109946
 
