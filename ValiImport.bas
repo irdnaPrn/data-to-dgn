@@ -40,10 +40,14 @@ Public Sub Import()
     Dim codes() As String, pointNumbers() As String, pts() As Point3d, vertices() As Point3d
     Dim pending As New Collection, pendingLevels As New Collection, added As New Collection
     Dim el As Element, cell As CellElement, pointCircle As EllipseElement, textEl As TextElement
-    Dim lev As Level, lineStyle As LineStyle, textStyle As TextStyle
-    Dim textPoint As Point3d
+    Dim heightText As TextElement
+    Dim lev As Level, lineStyle As LineStyle, textStyle As TextStyle, heightStyle As TextStyle
+    Dim engineeringFont As Font
+    Dim textPoint As Point3d, heightPoint As Point3d
+    Dim heightValue As String
     Dim cellCount As Long, lineCount As Long, message As String, definition As Variant
-    Dim codeTable As Object
+    Dim missingList As String, missingKey As Variant
+    Dim codeTable As Object, missingCodes As Object
     Dim firstRowChecked As Boolean, separatorSpecified As Boolean
     On Error GoTo Failed
     path = PickFile("Vali punktifail", "Punktifailid (*.txt;*.csv)", "*.txt;*.csv", "")
@@ -55,6 +59,8 @@ Public Sub Import()
         If Len(tablePath) = 0 Then Exit Sub
     End If
     Set codeTable = ReadCodeTable(tablePath)
+    Set missingCodes = CreateObject("Scripting.Dictionary")
+    missingCodes.CompareMode = 1
     lib = folder & "parnu_tm_mkm.cel"
     If Len(Dir$(lib)) = 0 Then
         lib = PickFile("Vali celliteek", "Celliteegid (*.cel)", "*.cel", folder)
@@ -90,7 +96,9 @@ Public Sub Import()
             firstRowChecked = True
             If count = 0 And LCase$(Join(parts, ",")) = "pnr,x,y,z,kood" Then GoTo NextRow
             If Len(Trim$(parts(0))) = 0 Then Err.Raise vbObjectError + 5, , "Punktinumber puudub real " & n
-            If Not codeTable.Exists(Trim$(parts(4))) Then Err.Raise vbObjectError + 6, , "Tundmatu kood real " & n & ": " & parts(4)
+            If Not codeTable.Exists(Trim$(parts(4))) Then
+                If Not missingCodes.Exists(Trim$(parts(4))) Then missingCodes.Add Trim$(parts(4)), True
+            End If
             count = count + 1
             ReDim Preserve codes(1 To count)
             ReDim Preserve pointNumbers(1 To count)
@@ -107,36 +115,57 @@ NextRow:
     AttachCellLibrary lib
     i = 1
     Do While i <= count
-        definition = codeTable(codes(i))
-        If definition(0) = "CELL" Then
-            Set cell = CreateCellElement2(definition(2), pts(i), Point3dFromXYZ(1, 1, 1), True, Matrix3dIdentity)
-            pending.Add cell
-            pendingLevels.Add definition(1)
-            cellCount = cellCount + 1
+        If Not codeTable.Exists(codes(i)) Then
             i = i + 1
         Else
-            last = i
-            Do While last < count
-                If codes(last + 1) <> codes(i) Then Exit Do
-                last = last + 1
-            Loop
-            If last = i Then Err.Raise vbObjectError + 8, , "Joonekoodil " & codes(i) & " on ainult uks punkt (kirje " & i & ")."
-            ReDim vertices(0 To last - i)
-            For j = i To last
-                vertices(j - i) = pts(j)
-                If j > i Then
-                    If pts(j).X = pts(j - 1).X And pts(j).Y = pts(j - 1).Y And pts(j).Z = pts(j - 1).Z Then
-                        Err.Raise vbObjectError + 9, , "Kattuvad jarjestikused joonepunktid: kirje " & j
-                    End If
+            definition = codeTable(codes(i))
+            If definition(0) = "CELL" Then
+                Set cell = CreateCellElement2(definition(2), pts(i), Point3dFromXYZ(CDbl(definition(3)), CDbl(definition(3)), 1), True, Matrix3dIdentity)
+                pending.Add cell
+                pendingLevels.Add definition(1)
+                If UCase$(CStr(definition(2))) = "RING02" Then
+                    If engineeringFont Is Nothing Then Set engineeringFont = FindFont("ENGINEERING")
+                    heightValue = Replace(Format$(pts(i).Z, "0.00"), ",", ".")
+                    heightPoint = Point3dFromXYZ(pts(i).X + 0.1, pts(i).Y, pts(i).Z)
+                    Set heightText = CreateTextElement1(Nothing, heightValue, heightPoint, Matrix3dIdentity)
+                    Set heightStyle = heightText.TextStyle
+                    heightStyle.Height = 0.85
+                    heightStyle.Width = 0.65
+                    heightStyle.Justification = msdTextJustificationLeftBottom
+                    Set heightStyle.Font = engineeringFont
+                    Set heightText.TextStyle = heightStyle
+                    pending.Add heightText
+                    pendingLevels.Add definition(1)
                 End If
-            Next j
-            Set el = CreateLineElement1(Nothing, vertices)
-            Set lineStyle = FindLineStyle(CStr(definition(2)))
-            Set el.LineStyle = lineStyle
-            pending.Add el
-            pendingLevels.Add definition(1)
-            lineCount = lineCount + 1
-            i = last + 1
+                cellCount = cellCount + 1
+                i = i + 1
+            Else
+                last = i
+                Do While last < count
+                    If codes(last + 1) <> codes(i) Then Exit Do
+                    last = last + 1
+                Loop
+                If last = i Then
+                    i = i + 1
+                Else
+                    ReDim vertices(0 To last - i)
+                    For j = i To last
+                        vertices(j - i) = pts(j)
+                        If j > i Then
+                            If pts(j).X = pts(j - 1).X And pts(j).Y = pts(j - 1).Y And pts(j).Z = pts(j - 1).Z Then
+                                Err.Raise vbObjectError + 9, , "Kattuvad jarjestikused joonepunktid: kirje " & j
+                            End If
+                        End If
+                    Next j
+                    Set el = CreateLineElement1(Nothing, vertices)
+                    Set lineStyle = FindLineStyle(CStr(definition(2)))
+                    Set el.LineStyle = lineStyle
+                    pending.Add el
+                    pendingLevels.Add definition(1)
+                    lineCount = lineCount + 1
+                    i = last + 1
+                End If
+            End If
         End If
     Loop
 
@@ -164,7 +193,20 @@ NextRow:
         ApplyLevel el, lev
         el.Redraw msdDrawingModeNormal
     Next i
-    MsgBox "Valmis: " & cellCount & " cell, " & lineCount & " joont, " & count & " mootepunkti koos numbritega." & vbCrLf & "Korduv import lisab samad elemendid uuesti.", vbInformation, "ValiImport"
+    message = "Valmis: " & cellCount & " cell, " & lineCount & " joont, " & count & " mootepunkti koos numbritega."
+    If missingCodes.count > 0 Then
+        For Each missingKey In missingCodes.Keys
+            If Len(missingList) > 0 Then missingList = missingList & ", "
+            If Len(CStr(missingKey)) = 0 Then
+                missingList = missingList & "(tuhi)"
+            Else
+                missingList = missingList & CStr(missingKey)
+            End If
+        Next missingKey
+        MsgBox message & vbCrLf & vbCrLf & "Kooditabelist puuduvad koodid: " & missingList & "." & vbCrLf & "Nende punktide kohta loodi ainult mootepunkt ja number.", vbExclamation, "ValiImport"
+    Else
+        MsgBox message, vbInformation, "ValiImport"
+    End If
     Exit Sub
 Failed:
     message = Err.Description
@@ -176,6 +218,15 @@ Failed:
     Next i
     MsgBox "Import katkestati: " & message, vbExclamation, "ValiImport"
 End Sub
+
+Private Function FindFont(ByVal name As String) As Font
+    Dim fontItem As Font
+    On Error Resume Next
+    Set fontItem = ActiveDesignFile.Fonts.Item(name)
+    On Error GoTo 0
+    If fontItem Is Nothing Then Err.Raise vbObjectError + 26, , "Fonti ei leitud: " & name
+    Set FindFont = fontItem
+End Function
 
 Private Function FindLineStyle(ByVal name As String) As LineStyle
     Dim style As LineStyle
@@ -203,7 +254,7 @@ End Function
 Private Function ReadCodeTable(ByVal path As String) As Object
     Dim table As Object, rows As Variant, parts As Variant
     Dim row As String, separator As String, code As String, itemType As String
-    Dim n As Long, fieldCount As Long
+    Dim n As Long, fieldCount As Long, cellScale As Double
     Set table = CreateObject("Scripting.Dictionary")
     table.CompareMode = 1
     rows = Split(Replace(Replace(ReadText(path), vbCrLf, vbLf), vbCr, vbLf), vbLf)
@@ -222,7 +273,7 @@ Private Function ReadCodeTable(ByVal path As String) As Object
             End If
             parts = ParseRow(row, separator)
             fieldCount = UBound(parts) + 1
-            If fieldCount <> 5 Then Err.Raise vbObjectError + 14, , "Kooditabeli real " & n & " oodati 5 valja, leiti " & fieldCount & "."
+            If fieldCount <> 6 Then Err.Raise vbObjectError + 14, , "Kooditabeli real " & n & " oodati 6 valja, leiti " & fieldCount & "."
             If table.count = 0 And LCase$(Trim$(parts(0))) = "kood" Then GoTo NextCodeRow
             code = Trim$(parts(0))
             itemType = UCase$(Trim$(parts(2)))
@@ -231,7 +282,13 @@ Private Function ReadCodeTable(ByVal path As String) As Object
             If itemType <> "CELL" And itemType <> "JOON" Then Err.Raise vbObjectError + 18, , "Kooditabeli real " & n & " peab tuup olema CELL voi JOON."
             If Len(Trim$(parts(3))) = 0 Then Err.Raise vbObjectError + 19, , "Kooditabeli real " & n & " puudub leveli nimi."
             If Len(Trim$(parts(4))) = 0 Then Err.Raise vbObjectError + 20, , "Kooditabeli real " & n & " puudub joone voi celli nimi."
-            table.Add code, Array(itemType, Trim$(parts(3)), Trim$(parts(4)))
+            cellScale = 1
+            If itemType = "CELL" Then
+                If Len(Trim$(parts(5))) = 0 Then Err.Raise vbObjectError + 24, , "Kooditabeli real " & n & " puudub celli skaala."
+                cellScale = Number(parts(5), n)
+                If cellScale <= 0 Then Err.Raise vbObjectError + 25, , "Kooditabeli real " & n & " peab celli skaala olema suurem kui null."
+            End If
+            table.Add code, Array(itemType, Trim$(parts(3)), Trim$(parts(4)), cellScale)
         End If
 NextCodeRow:
     Next n
