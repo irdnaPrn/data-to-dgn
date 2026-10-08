@@ -1,5 +1,10 @@
 1. Muuta cellide skaala, määrata see kooditabelis.
 2. Kõrguspunkt. Teksti suurus 0,85 0,65, font ENGINEERING
 3. Mõõtpunkt r=0,08m
-4. ValiImport infoaken pärast andmete sisselugemist muuta, kus see asub koodis.
-	Imporditi n punkti
+4. Enne andmete importi infoaken:
+	kood punkte, kui kood puudub kooditabelis siis "kood puudub",
+	valik ok: teeb impordi
+	valik cancel
+5. ValiImport ifoaken (Valmis: jne)eemaldada
+6. Mõõtpunkti teksti joondus left center
+7. Level: MOOTKORG-EH2000, kõrguse tekst, MOOTNR-ist allapoole, sama font, suurus ja joondus nagu MOOTNR.

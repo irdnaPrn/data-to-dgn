@@ -41,13 +41,12 @@ Public Sub Import()
     Dim pending As New Collection, pendingLevels As New Collection, added As New Collection
     Dim el As Element, cell As CellElement, pointCircle As EllipseElement, textEl As TextElement
     Dim heightText As TextElement
-    Dim lev As Level, lineStyle As LineStyle, textStyle As TextStyle, heightStyle As TextStyle
+    Dim lev As Level, lineStyle As lineStyle, textStyle As textStyle, heightStyle As textStyle
     Dim engineeringFont As Font
     Dim textPoint As Point3d, heightPoint As Point3d
     Dim heightValue As String
-    Dim cellCount As Long, lineCount As Long, message As String, definition As Variant
-    Dim missingList As String, missingKey As Variant
-    Dim codeTable As Object, missingCodes As Object
+    Dim message As String, definition As Variant
+    Dim codeTable As Object, codeCounts As Object
     Dim firstRowChecked As Boolean, separatorSpecified As Boolean
     On Error GoTo Failed
     path = PickFile("Vali punktifail", "Punktifailid (*.txt;*.csv)", "*.txt;*.csv", "")
@@ -59,8 +58,8 @@ Public Sub Import()
         If Len(tablePath) = 0 Then Exit Sub
     End If
     Set codeTable = ReadCodeTable(tablePath)
-    Set missingCodes = CreateObject("Scripting.Dictionary")
-    missingCodes.CompareMode = 1
+    Set codeCounts = CreateObject("Scripting.Dictionary")
+    codeCounts.CompareMode = 1
     lib = folder & "parnu_tm_mkm.cel"
     If Len(Dir$(lib)) = 0 Then
         lib = PickFile("Vali celliteek", "Celliteegid (*.cel)", "*.cel", folder)
@@ -96,9 +95,6 @@ Public Sub Import()
             firstRowChecked = True
             If count = 0 And LCase$(Join(parts, ",")) = "pnr,x,y,z,kood" Then GoTo NextRow
             If Len(Trim$(parts(0))) = 0 Then Err.Raise vbObjectError + 5, , "Punktinumber puudub real " & n
-            If Not codeTable.Exists(Trim$(parts(4))) Then
-                If Not missingCodes.Exists(Trim$(parts(4))) Then missingCodes.Add Trim$(parts(4)), True
-            End If
             count = count + 1
             ReDim Preserve codes(1 To count)
             ReDim Preserve pointNumbers(1 To count)
@@ -106,10 +102,16 @@ Public Sub Import()
             codes(count) = Trim$(parts(4))
             pointNumbers(count) = Trim$(parts(0))
             pts(count) = Point3dFromXYZ(Number(parts(2), n), Number(parts(1), n), Number(parts(3), n))
+            If codeCounts.Exists(codes(count)) Then
+                codeCounts(codes(count)) = CLng(codeCounts(codes(count))) + 1
+            Else
+                codeCounts.Add codes(count), 1&
+            End If
         End If
 NextRow:
     Next n
     If count = 0 Then Err.Raise vbObjectError + 7, , "Punktifail on tuhi."
+    If Not ConfirmImport(codeCounts, codeTable, count) Then Exit Sub
 
     ' Build every element before adding any geometry to the model.
     AttachCellLibrary lib
@@ -126,18 +128,17 @@ NextRow:
                 If UCase$(CStr(definition(2))) = "RING02" Then
                     If engineeringFont Is Nothing Then Set engineeringFont = FindFont("ENGINEERING")
                     heightValue = Replace(Format$(pts(i).Z, "0.00"), ",", ".")
-                    heightPoint = Point3dFromXYZ(pts(i).X + 0.1, pts(i).Y, pts(i).Z)
+                    heightPoint = Point3dFromXYZ(pts(i).X + 0.3, pts(i).Y - 0.5, pts(i).Z)
                     Set heightText = CreateTextElement1(Nothing, heightValue, heightPoint, Matrix3dIdentity)
-                    Set heightStyle = heightText.TextStyle
+                    Set heightStyle = heightText.textStyle
                     heightStyle.Height = 0.85
                     heightStyle.Width = 0.65
                     heightStyle.Justification = msdTextJustificationLeftBottom
                     Set heightStyle.Font = engineeringFont
-                    Set heightText.TextStyle = heightStyle
+                    Set heightText.textStyle = heightStyle
                     pending.Add heightText
                     pendingLevels.Add definition(1)
                 End If
-                cellCount = cellCount + 1
                 i = i + 1
             Else
                 last = i
@@ -159,10 +160,9 @@ NextRow:
                     Next j
                     Set el = CreateLineElement1(Nothing, vertices)
                     Set lineStyle = FindLineStyle(CStr(definition(2)))
-                    Set el.LineStyle = lineStyle
+                    Set el.lineStyle = lineStyle
                     pending.Add el
                     pendingLevels.Add definition(1)
-                    lineCount = lineCount + 1
                     i = last + 1
                 End If
             End If
@@ -170,18 +170,26 @@ NextRow:
     Loop
 
     For i = 1 To count
-        Set pointCircle = CreateEllipseElement2(Nothing, pts(i), 0.1, 0.1, Matrix3dIdentity, msdFillModeNotFilled)
+        Set pointCircle = CreateEllipseElement2(Nothing, pts(i), 0.08, 0.08, Matrix3dIdentity, msdFillModeNotFilled)
         pending.Add pointCircle
         pendingLevels.Add "MOOTMPUNKT"
 
-        textPoint = Point3dFromXYZ(pts(i).X + 0.15, pts(i).Y + 0.15, pts(i).Z)
+        textPoint = Point3dFromXYZ(pts(i).X + 0.25, pts(i).Y + 0.15, pts(i).Z)
         Set textEl = CreateTextElement1(Nothing, pointNumbers(i), textPoint, Matrix3dIdentity)
-        Set textStyle = textEl.TextStyle
-        textStyle.Height = 0.1
-        textStyle.Width = 0.1
-        Set textEl.TextStyle = textStyle
+        Set textStyle = textEl.textStyle
+        textStyle.Height = 0.2
+        textStyle.Width = 0.2
+        textStyle.Justification = msdTextJustificationLeftCenter
+        Set textEl.textStyle = textStyle
         pending.Add textEl
         pendingLevels.Add "MOOTNR"
+
+        heightValue = Replace(Format$(pts(i).Z, "0.00"), ",", ".")
+        heightPoint = Point3dFromXYZ(textPoint.X, textPoint.Y - 0.3, textPoint.Z)
+        Set heightText = CreateTextElement1(Nothing, heightValue, heightPoint, Matrix3dIdentity)
+        Set heightText.textStyle = textStyle
+        pending.Add heightText
+        pendingLevels.Add "MOOTKORG-EH2000"
     Next i
 
     For i = 1 To pending.count
@@ -193,20 +201,6 @@ NextRow:
         ApplyLevel el, lev
         el.Redraw msdDrawingModeNormal
     Next i
-    message = "Valmis: " & cellCount & " cell, " & lineCount & " joont, " & count & " mootepunkti koos numbritega."
-    If missingCodes.count > 0 Then
-        For Each missingKey In missingCodes.Keys
-            If Len(missingList) > 0 Then missingList = missingList & ", "
-            If Len(CStr(missingKey)) = 0 Then
-                missingList = missingList & "(tuhi)"
-            Else
-                missingList = missingList & CStr(missingKey)
-            End If
-        Next missingKey
-        MsgBox message & vbCrLf & vbCrLf & "Kooditabelist puuduvad koodid: " & missingList & "." & vbCrLf & "Nende punktide kohta loodi ainult mootepunkt ja number.", vbExclamation, "ValiImport"
-    Else
-        MsgBox message, vbInformation, "ValiImport"
-    End If
     Exit Sub
 Failed:
     message = Err.Description
@@ -219,6 +213,43 @@ Failed:
     MsgBox "Import katkestati: " & message, vbExclamation, "ValiImport"
 End Sub
 
+Private Function ConfirmImport(ByVal codeCounts As Object, ByVal codeTable As Object, ByVal pointCount As Long) As Boolean
+    Dim pages As New Collection
+    Dim codeKey As Variant, codeLabel As String, entry As String, pageText As String
+    Dim pageIndex As Long, pageRows As Long, prompt As String, actionText As String
+
+    ' Keep each dialog short enough to display the complete code list.
+    For Each codeKey In codeCounts.Keys
+        codeLabel = CStr(codeKey)
+        If Len(codeLabel) = 0 Then codeLabel = "(tuhi)"
+        entry = codeLabel & " | " & CStr(codeCounts(codeKey))
+        If Not codeTable.Exists(codeKey) Then entry = entry & " | kood puudub"
+        If Len(pageText) > 0 Then
+            If Len(pageText) + Len(entry) + 2 > 750 Or pageRows >= 20 Then
+                pages.Add pageText
+                pageText = ""
+                pageRows = 0
+            End If
+        End If
+        If Len(pageText) > 0 Then pageText = pageText & vbCrLf
+        pageText = pageText & entry
+        pageRows = pageRows + 1
+    Next codeKey
+    If Len(pageText) > 0 Then pages.Add pageText
+
+    For pageIndex = 1 To pages.count
+        If pageIndex = pages.count Then
+            actionText = "OK: impordi. Cancel: katkesta."
+        Else
+            actionText = "OK: vaata jargmist lehte. Cancel: katkesta."
+        End If
+        prompt = "Punkte kokku: " & pointCount & vbCrLf & "Kood | Punkte | Info" & vbCrLf & vbCrLf & _
+            CStr(pages(pageIndex)) & vbCrLf & vbCrLf & actionText
+        If MsgBox(prompt, vbOKCancel Or vbInformation, "Impordi eelvaade (" & pageIndex & "/" & pages.count & ")") <> vbOK Then Exit Function
+    Next pageIndex
+    ConfirmImport = True
+End Function
+
 Private Function FindFont(ByVal name As String) As Font
     Dim fontItem As Font
     On Error Resume Next
@@ -228,8 +259,8 @@ Private Function FindFont(ByVal name As String) As Font
     Set FindFont = fontItem
 End Function
 
-Private Function FindLineStyle(ByVal name As String) As LineStyle
-    Dim style As LineStyle
+Private Function FindLineStyle(ByVal name As String) As lineStyle
+    Dim style As lineStyle
     On Error Resume Next
     If IsNumeric(name) Then
         Set style = ActiveDesignFile.LineStyles.Item(CLng(name))
@@ -299,7 +330,7 @@ End Function
 Private Function Number(ByVal value As String, ByVal row As Long) As Double
     Dim re As Object
     Set re = CreateObject("VBScript.RegExp")
-    re.Pattern = "^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?$"
+    re.pattern = "^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?$"
     value = Replace(Trim$(value), ",", ".")
     If Not re.Test(value) Then Err.Raise vbObjectError + 10, , "Vigane arv real " & row & ": " & value
     Number = Val(value)
