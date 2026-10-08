@@ -320,6 +320,7 @@ End Function
 Private Sub ApplyLevel(ByVal el As Element, ByVal lev As Level)
     Dim children As ElementEnumerator, child As Element
     Set el.Level = lev
+    el.Color = -1 ' ByLevel, including nested cell components.
     el.Rewrite
     If el.IsComplexElement Then
         Set children = el.AsComplexElement.GetSubElements

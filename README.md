@@ -36,3 +36,7 @@ Failidialoog kasutab Windowsi Unicode API-t ja on mõeldud **32-bitisele PowerDr
 ## Järgmine etapp
 
 Kooditabeli muutmise kasutajaliides ja celliteegi valitud asukoha salvestamine lisanduvad hiljem.
+
+## Värv
+
+Kõigi uuel impordil loodud elementide, ka cellide alamelementide värv on ByLevel. Varem imporditud elemente see muudatus ei muuda. Värvimuudatuse käitustest PowerDraftis on veel tegemata.
