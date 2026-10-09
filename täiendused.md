@@ -8,3 +8,6 @@
 5. ValiImport ifoaken (Valmis: jne)eemaldada
 6. Mõõtpunkti teksti joondus left center
 7. Level: MOOTKORG-EH2000, kõrguse tekst, MOOTNR-ist allapoole, sama font, suurus ja joondus nagu MOOTNR.
+8. Andmete impordi infoaken. Nupud: "Import" ja "Katkesta", selgitus eemaldada.
+9. Kõrgusarvu pööramine. Teksti (level: KORGUS-EH2000) pööramine, "ankurpunktiks" on celli RING02 keskpunkt.
+10. 

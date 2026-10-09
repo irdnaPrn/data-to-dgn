@@ -30,6 +30,15 @@ End Type
 Private Declare Function GetOpenFileNameW Lib "comdlg32.dll" (ByRef info As OpenFileInfo) As Long
 Private Declare Function CommDlgExtendedError Lib "comdlg32.dll" () As Long
 Private Declare Function GetActiveWindow Lib "user32.dll" () As Long
+Private Declare Function SetWindowsHookExW Lib "user32.dll" (ByVal hookType As Long, ByVal callback As Long, ByVal instance As Long, ByVal threadId As Long) As Long
+Private Declare Function UnhookWindowsHookEx Lib "user32.dll" (ByVal hook As Long) As Long
+Private Declare Function CallNextHookEx Lib "user32.dll" (ByVal hook As Long, ByVal code As Long, ByVal windowHandle As Long, ByVal info As Long) As Long
+Private Declare Function GetCurrentThreadId Lib "kernel32.dll" () As Long
+Private Declare Function GetDlgItem Lib "user32.dll" (ByVal dialogHandle As Long, ByVal controlId As Long) As Long
+Private Declare Function GetWindowTextW Lib "user32.dll" (ByVal windowHandle As Long, ByVal buffer As Long, ByVal maxCount As Long) As Long
+Private Declare Function SetDlgItemTextW Lib "user32.dll" (ByVal dialogHandle As Long, ByVal controlId As Long, ByVal caption As Long) As Long
+Private previewHook As Long
+Private previewTitle As String, previewButton As String
 
 ' V8i prototype: coordinates in master units, X=north, Y=east.
 ' Consecutive equal line codes form one open line string.
@@ -39,6 +48,7 @@ Public Sub Import()
     Dim n As Long, count As Long, i As Long, j As Long, last As Long
     Dim codes() As String, pointNumbers() As String, pts() As Point3d, vertices() As Point3d
     Dim pending As New Collection, pendingLevels As New Collection, added As New Collection
+    Dim ringTexts As New Collection, ringCells As New Collection
     Dim el As Element, cell As CellElement, pointCircle As EllipseElement, textEl As TextElement
     Dim heightText As TextElement
     Dim lev As Level, lineStyle As lineStyle, textStyle As textStyle, heightStyle As textStyle
@@ -136,6 +146,8 @@ NextRow:
                     heightStyle.Justification = msdTextJustificationLeftBottom
                     Set heightStyle.Font = engineeringFont
                     Set heightText.textStyle = heightStyle
+                    ringTexts.Add heightText
+                    ringCells.Add cell
                     pending.Add heightText
                     pendingLevels.Add definition(1)
                 End If
@@ -201,6 +213,9 @@ NextRow:
         ApplyLevel el, lev
         el.Redraw msdDrawingModeNormal
     Next i
+    For i = 1 To ringTexts.count
+        KorgusePooramine.LinkTextToCell ringTexts(i), ringCells(i)
+    Next i
     Exit Sub
 Failed:
     message = Err.Description
@@ -216,7 +231,7 @@ End Sub
 Private Function ConfirmImport(ByVal codeCounts As Object, ByVal codeTable As Object, ByVal pointCount As Long) As Boolean
     Dim pages As New Collection
     Dim codeKey As Variant, codeLabel As String, entry As String, pageText As String
-    Dim pageIndex As Long, pageRows As Long, prompt As String, actionText As String
+    Dim pageIndex As Long, pageRows As Long, prompt As String, buttonCaption As String
 
     ' Keep each dialog short enough to display the complete code list.
     For Each codeKey In codeCounts.Keys
@@ -239,15 +254,60 @@ Private Function ConfirmImport(ByVal codeCounts As Object, ByVal codeTable As Ob
 
     For pageIndex = 1 To pages.count
         If pageIndex = pages.count Then
-            actionText = "OK: impordi. Cancel: katkesta."
+            buttonCaption = "Import"
         Else
-            actionText = "OK: vaata jargmist lehte. Cancel: katkesta."
+            buttonCaption = "Edasi"
         End If
         prompt = "Punkte kokku: " & pointCount & vbCrLf & "Kood | Punkte | Info" & vbCrLf & vbCrLf & _
-            CStr(pages(pageIndex)) & vbCrLf & vbCrLf & actionText
-        If MsgBox(prompt, vbOKCancel Or vbInformation, "Impordi eelvaade (" & pageIndex & "/" & pages.count & ")") <> vbOK Then Exit Function
+            CStr(pages(pageIndex))
+        If PreviewMessageBox(prompt, "Impordi eelvaade (" & pageIndex & "/" & pages.count & ")", buttonCaption) <> vbOK Then Exit Function
     Next pageIndex
     ConfirmImport = True
+End Function
+
+Private Function PreviewMessageBox(ByVal prompt As String, ByVal title As String, ByVal buttonCaption As String) As Long
+    Dim errorNumber As Long, errorText As String
+    On Error GoTo Failed
+    previewTitle = title
+    previewButton = buttonCaption
+    ' Thread-local CBT hook: rename this existing MsgBox before it is shown.
+    previewHook = SetWindowsHookExW(5, AddressOf PreviewDialogHook, 0, GetCurrentThreadId())
+    If previewHook = 0 Then Err.Raise vbObjectError + 27, , "Impordidialoogi nuppude seadistamine ebaonnestus."
+    PreviewMessageBox = MsgBox(prompt, vbOKCancel Or vbInformation, title)
+    If previewHook <> 0 Then UnhookWindowsHookEx previewHook
+    previewHook = 0
+    Exit Function
+Failed:
+    errorNumber = Err.Number
+    errorText = Err.Description
+    If previewHook <> 0 Then UnhookWindowsHookEx previewHook
+    previewHook = 0
+    Err.Raise errorNumber, "ValiImport.PreviewMessageBox", errorText
+End Function
+
+Public Function PreviewDialogHook(ByVal code As Long, ByVal windowHandle As Long, ByVal info As Long) As Long
+    Dim titleBuffer As String, titleLength As Long, cancelCaption As String
+    Dim hookHandle As Long, renamed As Boolean
+    ' Errors must never propagate across a Windows callback boundary.
+    On Error Resume Next
+    hookHandle = previewHook
+    If code = 5 Then ' HCBT_ACTIVATE
+        titleBuffer = String$(256, vbNullChar)
+        titleLength = GetWindowTextW(windowHandle, StrPtr(titleBuffer), Len(titleBuffer))
+        If Left$(titleBuffer, titleLength) = previewTitle Then
+            If GetDlgItem(windowHandle, vbOK) <> 0 And GetDlgItem(windowHandle, vbCancel) <> 0 Then
+                cancelCaption = "Katkesta"
+                SetDlgItemTextW windowHandle, vbOK, StrPtr(previewButton)
+                SetDlgItemTextW windowHandle, vbCancel, StrPtr(cancelCaption)
+                renamed = True
+            End If
+        End If
+    End If
+    PreviewDialogHook = CallNextHookEx(hookHandle, code, windowHandle, info)
+    If renamed Then
+        UnhookWindowsHookEx hookHandle
+        previewHook = 0
+    End If
 End Function
 
 Private Function FindFont(ByVal name As String) As Font
