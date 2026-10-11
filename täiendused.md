@@ -10,4 +10,6 @@
 7. Level: MOOTKORG-EH2000, kõrguse tekst, MOOTNR-ist allapoole, sama font, suurus ja joondus nagu MOOTNR.
 8. Andmete impordi infoaken. Nupud: "Import" ja "Katkesta", selgitus eemaldada.
 9. Kõrgusarvu pööramine. Teksti (level: KORGUS-EH2000) pööramine, "ankurpunktiks" on celli RING02 keskpunkt.
-10. 
+10. kooditabel.csv Koodnimi muudetud Info. Impordi eelvaates kuvada Info all. Kui kooditabelis vaste puudub siis "kood puudub" punase värviga.
+11. Kõrguse pööramisel abijoon, mis liigub kaasa kui pööran, algus RING02, lõpp kursori juures, joone tüüp: MicroStation joon nr.1
+12. Esimene hiire klõps kõrguse valimine, sealt jääb joon "hiire külge". Joon peaks ALGUSES olema alati horisontaalne, siis saab teksti täpselt pöörata. Kui valin teksti, hiire klõps satub näiteks teksti allaossa, siis ei pole abijoonest tolku.

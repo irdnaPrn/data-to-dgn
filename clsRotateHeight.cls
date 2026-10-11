@@ -13,7 +13,7 @@ Implements IPrimitiveCommandEvents
 Private mText As Element, mRing As Element
 Private mOriginal As Element
 Private mCenter As Point3d
-Private mStartAngle As Double
+Private mTextAngle As Double
 
 Private Sub IPrimitiveCommandEvents_Start()
     CommandState.SetLocateCursor
@@ -23,6 +23,7 @@ End Sub
 
 Private Sub IPrimitiveCommandEvents_DataPoint(Point As Point3d, ByVal View As View)
     Dim located As Element, rotated As Element, angle As Double
+    Dim textRotation As Matrix3d
     On Error GoTo Failed
     If mText Is Nothing Then
         Set located = CommandState.LocateElement(Point, View, True)
@@ -38,7 +39,10 @@ Private Sub IPrimitiveCommandEvents_DataPoint(Point As Point3d, ByVal View As Vi
         End If
         Set mRing = KorgusePooramine.FindRing(located)
         mCenter = mRing.AsCellElement.Origin
-        mStartAngle = KorgusePooramine.RayAngle(mCenter, Point)
+        textRotation = located.AsTextElement.Rotation
+        If Not Matrix3dIsXYRotation(textRotation, mTextAngle) Then
+            Err.Raise vbObjectError + 57, , "Tekst peab asuma XY-tasandis."
+        End If
         Set mOriginal = located.Clone
         Set mText = located
         ActiveModelReference.SelectElement mText, True
@@ -48,7 +52,7 @@ Private Sub IPrimitiveCommandEvents_DataPoint(Point As Point3d, ByVal View As Vi
     End If
 
     If Point.X = mCenter.X And Point.Y = mCenter.Y Then Exit Sub
-    angle = KorgusePooramine.RayAngle(mCenter, Point) - mStartAngle
+    angle = KorgusePooramine.RayAngle(mCenter, Point) - mTextAngle
     Set rotated = KorgusePooramine.RotatedCopy(mOriginal, mCenter, angle)
     KorgusePooramine.LinkTextToCell rotated, mRing, False
     CommandState.StopDynamics
@@ -65,13 +69,16 @@ Failed:
 End Sub
 
 Private Sub IPrimitiveCommandEvents_Dynamics(Point As Point3d, ByVal View As View, ByVal DrawMode As MsdDrawingMode)
-    Dim preview As Element, angle As Double
+    Dim preview As Element, guide As LineElement, angle As Double
     On Error GoTo IgnoreFrame
     If mText Is Nothing Then Exit Sub
     If Point.X = mCenter.X And Point.Y = mCenter.Y Then Exit Sub
-    angle = KorgusePooramine.RayAngle(mCenter, Point) - mStartAngle
+    angle = KorgusePooramine.RayAngle(mCenter, Point) - mTextAngle
     Set preview = KorgusePooramine.RotatedCopy(mOriginal, mCenter, angle)
     preview.Redraw DrawMode
+    Set guide = CreateLineElement2(mOriginal, mCenter, Point)
+    Set guide.LineStyle = ActiveDesignFile.LineStyles.Item(1)
+    guide.Redraw DrawMode
 IgnoreFrame:
 End Sub
 

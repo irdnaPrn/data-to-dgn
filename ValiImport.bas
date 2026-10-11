@@ -232,13 +232,20 @@ Private Function ConfirmImport(ByVal codeCounts As Object, ByVal codeTable As Ob
     Dim pages As New Collection
     Dim codeKey As Variant, codeLabel As String, entry As String, pageText As String
     Dim pageIndex As Long, pageRows As Long, prompt As String, buttonCaption As String
+    Dim definition As Variant, infoText As String
 
     ' Keep each dialog short enough to display the complete code list.
     For Each codeKey In codeCounts.Keys
         codeLabel = CStr(codeKey)
         If Len(codeLabel) = 0 Then codeLabel = "(tuhi)"
         entry = codeLabel & " | " & CStr(codeCounts(codeKey))
-        If Not codeTable.Exists(codeKey) Then entry = entry & " | kood puudub"
+        If codeTable.Exists(codeKey) Then
+            definition = codeTable(codeKey)
+            infoText = CStr(definition(4))
+        Else
+            infoText = "kood puudub"
+        End If
+        entry = entry & " | " & infoText
         If Len(pageText) > 0 Then
             If Len(pageText) + Len(entry) + 2 > 750 Or pageRows >= 20 Then
                 pages.Add pageText
@@ -379,7 +386,7 @@ Private Function ReadCodeTable(ByVal path As String) As Object
                 cellScale = Number(parts(5), n)
                 If cellScale <= 0 Then Err.Raise vbObjectError + 25, , "Kooditabeli real " & n & " peab celli skaala olema suurem kui null."
             End If
-            table.Add code, Array(itemType, Trim$(parts(3)), Trim$(parts(4)), cellScale)
+            table.Add code, Array(itemType, Trim$(parts(3)), Trim$(parts(4)), cellScale, Trim$(parts(1)))
         End If
 NextCodeRow:
     Next n
