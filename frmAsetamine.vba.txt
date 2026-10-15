@@ -1,0 +1,78 @@
+Option Explicit
+
+Private WithEvents mLevels As MSForms.ComboBox
+Private WithEvents mItems As MSForms.ListBox
+Private WithEvents mPlace As MSForms.CommandButton
+Private WithEvents mClose As MSForms.CommandButton
+Private mTable As Object
+Public SelectedCode As String
+
+Private Sub UserForm_Initialize()
+    Dim label As Object
+    Me.Caption = "Elementide asetamine"
+    Me.Width = 430: Me.Height = 330
+    Set label = TooriistaAknad.Control(Me, "Label", "lblLevel", 12, 12, 70, 18, "Level")
+    Set mLevels = TooriistaAknad.Control(Me, "ComboBox", "cboLevel", 85, 10, 320, 22)
+    mLevels.Style = fmStyleDropDownList
+    Set label = TooriistaAknad.Control(Me, "Label", "lblItems", 12, 43, 390, 18, "Kood | Info | Tyyp | Nimi")
+    Set mItems = TooriistaAknad.Control(Me, "ListBox", "lstItems", 12, 64, 393, 180)
+    mItems.ColumnCount = 4
+    mItems.ColumnWidths = "42 pt;140 pt;45 pt;140 pt"
+    Set mPlace = TooriistaAknad.Control(Me, "CommandButton", "cmdPlace", 195, 260, 100, 25, "Aseta")
+    Set mClose = TooriistaAknad.Control(Me, "CommandButton", "cmdClose", 305, 260, 100, 25, "Sulge")
+    mClose.Cancel = True
+End Sub
+
+Public Sub Configure(ByVal table As Object)
+    Dim levels As Object, key As Variant, definition As Variant
+    Set mTable = table
+    Set levels = CreateObject("Scripting.Dictionary")
+    levels.CompareMode = 1
+    For Each key In table.Keys
+        definition = table(key)
+        If Not levels.Exists(CStr(definition(1))) Then
+            levels.Add CStr(definition(1)), True
+            mLevels.AddItem CStr(definition(1))
+        End If
+    Next key
+    If mLevels.ListCount > 0 Then mLevels.ListIndex = 0
+End Sub
+
+Private Sub mLevels_Change()
+    Dim key As Variant, definition As Variant, row As Long
+    If mTable Is Nothing Then Exit Sub
+    mItems.Clear
+    For Each key In mTable.Keys
+        definition = mTable(key)
+        If StrComp(CStr(definition(1)), mLevels.Value, vbTextCompare) = 0 Then
+            mItems.AddItem CStr(key)
+            row = mItems.ListCount - 1
+            mItems.List(row, 1) = CStr(definition(4))
+            mItems.List(row, 2) = CStr(definition(0))
+            mItems.List(row, 3) = CStr(definition(2))
+        End If
+    Next key
+    If mItems.ListCount > 0 Then mItems.ListIndex = 0
+End Sub
+
+Private Sub mPlace_Click()
+    If mItems.ListIndex < 0 Then Exit Sub
+    SelectedCode = CStr(mItems.List(mItems.ListIndex, 0))
+    Me.Hide
+End Sub
+
+Private Sub mItems_DblClick(ByVal Cancel As MSForms.ReturnBoolean)
+    mPlace_Click
+End Sub
+
+Private Sub mClose_Click()
+    SelectedCode = ""
+    Me.Hide
+End Sub
+
+Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
+    If CloseMode = vbFormControlMenu Then
+        Cancel = True
+        mClose_Click
+    End If
+End Sub

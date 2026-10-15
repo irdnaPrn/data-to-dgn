@@ -2,6 +2,8 @@
 
 Töötav VBA prototüüp MicroStation PowerDraft V8i 08.11.09.829 jaoks. Kasutaja kinnitas failivaliku, SPYMAR celli ja kahe joone loomise õigetele levelitele. Repo sisaldab lähtemoodulit (.bas); .mvba projekt salvestatakse PowerDraftis.
 
+Punktide 13–14 lähtekood lisab käsitsi asetamise, püsivad punktinumbrid ning ekspordi. **Uuendatud import vajab ka `ElementAndmed.bas` moodulit.** Kõigi uute moodulite ja kahe vormi paigaldus ning kasutamine on kirjas [paigaldusjuhendis](PAIGALDUS-13-14.md). Uute akende töö vajab veel PowerDraftis kontrollimist.
+
 1. Ava PowerDraft V8i-s tühi **3D DGN**, mille põhiühik on **meeter**.
 2. Ava Utilities → Macro → Project Manager (või sisesta `VBA PROJECT MANAGER`). Loo uus projekt nimega **ValiImport** ja salvesta see .mvba failina.
 3. Ava projekti VBA redaktor. Kui vana `ValiImport` moodul on juba olemas, eemalda see Project Exploreris paremklõpsuga **Remove ValiImport** (soovi korral ekspordi varukoopia). Vali **File → Import File** ja impordi uus `ValiImport.bas`. Ära jäta vana ja uut moodulit korraga projekti.
@@ -14,7 +16,7 @@ Oodatav tulemus: üks SPYMAR cell levelil ALUSVORK, kaks eraldi kahepunktijoont 
 
 ## Prototüübi reeglid
 
-- Sisend: `pnr,x,y,z,kood`. Päis on lubatud. Esimene sisuline rida võib selle asemel sisaldada töö nime, kuupäeva või muud faili infot: kui see ei ole päis ega viieväljaline andmerida, jäetakse see vahele. Korrektne viieväljaline esimene punktirida imporditakse tavaliselt. Eraldajaks sobib koma, semikoolon või tabulaator. Semikooloni/tabulaatori puhul võib kümnendmärk olla koma. Toetatud on jutumärkides väljad ja Exceli `sep=;` algusrida.
+- Sisend: `pnr,x,y,z,kood` või `pnr,x,y,z,kood,märkus`. Kuues väli on valikuline märkus, mida importimisel eiratakse; samas failis võivad olla nii viie kui ka kuue väljaga read. Päis on lubatud. Esimene sisuline rida võib selle asemel sisaldada töö nime, kuupäeva või muud faili infot: kui see ei ole päis ega viie või kuue väljaga andmerida, jäetakse see vahele. Korrektne esimene punktirida imporditakse tavaliselt. Eraldajaks sobib koma, semikoolon või tabulaator. Semikooloni/tabulaatori puhul võib kümnendmärk olla koma. Toetatud on jutumärkides väljad ja Exceli `sep=;` algusrida.
 - Toetatud on UTF-8 (ka BOM-iga), BOM-iga UTF-16 ja lihtsad ASCII andmeread. Päise nimed peavad olema pnr, x, y, z, kood.
 - Algse näidisfaili `Selgitus:` rida lõpetab andmete lugemise; sellele järgnev selgitus ei ole imporditav andmestik. Muu vigane rida annab vea koos rea sisuga.
 - Faili X on põhi, Y ida. Joonise X saab faili Y; joonise Y saab faili X. Z säilib.

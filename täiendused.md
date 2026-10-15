@@ -13,3 +13,5 @@
 10. kooditabel.csv Koodnimi muudetud Info. Impordi eelvaates kuvada Info all. Kui kooditabelis vaste puudub siis "kood puudub" punase värviga.
 11. Kõrguse pööramisel abijoon, mis liigub kaasa kui pööran, algus RING02, lõpp kursori juures, joone tüüp: MicroStation joon nr.1
 12. Esimene hiire klõps kõrguse valimine, sealt jääb joon "hiire külge". Joon peaks ALGUSES olema alati horisontaalne, siis saab teksti täpselt pöörata. Kui valin teksti, hiire klõps satub näiteks teksti allaossa, siis ei pole abijoonest tolku.
+13. Cellide, joonte asetamine plaanie. Menüü: Leveli järgi, Levelite all vastavad jooned ja cellid. Nimekirjast teen valiku ja asetan dgn-i. Igal elemendil indeks e. järjekorra nr.
+14. Plaanil olevate elementide andmete (indeks, x, y, z, kood) export tabelina ekraanile või txt faili.

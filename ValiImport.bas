@@ -28,6 +28,7 @@ Private Type OpenFileInfo
     flagsEx As Long
 End Type
 Private Declare Function GetOpenFileNameW Lib "comdlg32.dll" (ByRef info As OpenFileInfo) As Long
+Private Declare Function GetSaveFileNameW Lib "comdlg32.dll" (ByRef info As OpenFileInfo) As Long
 Private Declare Function CommDlgExtendedError Lib "comdlg32.dll" () As Long
 Private Declare Function GetActiveWindow Lib "user32.dll" () As Long
 Private Declare Function SetWindowsHookExW Lib "user32.dll" (ByVal hookType As Long, ByVal callback As Long, ByVal instance As Long, ByVal threadId As Long) As Long
@@ -47,6 +48,7 @@ Public Sub Import()
     Dim row As String, parts As Variant, rows As Variant, separator As String
     Dim n As Long, count As Long, i As Long, j As Long, last As Long
     Dim codes() As String, pointNumbers() As String, pts() As Point3d, vertices() As Point3d
+    Dim featurePoint() As Boolean, vertexNumbers As Variant
     Dim pending As New Collection, pendingLevels As New Collection, added As New Collection
     Dim ringTexts As New Collection, ringCells As New Collection
     Dim el As Element, cell As CellElement, pointCircle As EllipseElement, textEl As TextElement
@@ -94,16 +96,17 @@ Public Sub Import()
                 If InStr(row, vbTab) > 0 Then separator = vbTab
             End If
             parts = ParseRow(row, separator)
-            If UBound(parts) <> 4 Then
+            If UBound(parts) < 4 Or UBound(parts) > 5 Then
                 If Not firstRowChecked Then
                     firstRowChecked = True
                     If Not separatorSpecified Then separator = ""
                     GoTo NextRow
                 End If
-                Err.Raise vbObjectError + 4, , "Fail: " & path & vbCrLf & "Real " & n & " oodati 5 valja, leiti " & (UBound(parts) + 1) & "." & vbCrLf & Left$(row, 160)
+                Err.Raise vbObjectError + 4, , "Fail: " & path & vbCrLf & "Real " & n & " oodati 5 voi 6 valja, leiti " & (UBound(parts) + 1) & "." & vbCrLf & Left$(row, 160)
             End If
             firstRowChecked = True
-            If count = 0 And LCase$(Join(parts, ",")) = "pnr,x,y,z,kood" Then GoTo NextRow
+            If count = 0 And LCase$(Join(Array(parts(0), parts(1), parts(2), parts(3), parts(4)), ",")) = "pnr,x,y,z,kood" Then GoTo NextRow
+            ' Optional sixth field is a remark; only the first five fields are imported.
             If Len(Trim$(parts(0))) = 0 Then Err.Raise vbObjectError + 5, , "Punktinumber puudub real " & n
             count = count + 1
             ReDim Preserve codes(1 To count)
@@ -122,6 +125,7 @@ NextRow:
     Next n
     If count = 0 Then Err.Raise vbObjectError + 7, , "Punktifail on tuhi."
     If Not ConfirmImport(codeCounts, codeTable, count) Then Exit Sub
+    ReDim featurePoint(1 To count)
 
     ' Build every element before adding any geometry to the model.
     AttachCellLibrary lib
@@ -133,6 +137,8 @@ NextRow:
             definition = codeTable(codes(i))
             If definition(0) = "CELL" Then
                 Set cell = CreateCellElement2(definition(2), pts(i), Point3dFromXYZ(CDbl(definition(3)), CDbl(definition(3)), 1), True, Matrix3dIdentity)
+                ElementAndmed.Store cell, "CELL", codes(i), Array(pointNumbers(i))
+                featurePoint(i) = True
                 pending.Add cell
                 pendingLevels.Add definition(1)
                 If UCase$(CStr(definition(2))) = "RING02" Then
@@ -162,8 +168,11 @@ NextRow:
                     i = i + 1
                 Else
                     ReDim vertices(0 To last - i)
+                    ReDim vertexNumbers(0 To last - i)
                     For j = i To last
                         vertices(j - i) = pts(j)
+                        vertexNumbers(j - i) = pointNumbers(j)
+                        featurePoint(j) = True
                         If j > i Then
                             If pts(j).X = pts(j - 1).X And pts(j).Y = pts(j - 1).Y And pts(j).Z = pts(j - 1).Z Then
                                 Err.Raise vbObjectError + 9, , "Kattuvad jarjestikused joonepunktid: kirje " & j
@@ -171,6 +180,7 @@ NextRow:
                         End If
                     Next j
                     Set el = CreateLineElement1(Nothing, vertices)
+                    ElementAndmed.Store el, "JOON", codes(i), vertexNumbers
                     Set lineStyle = FindLineStyle(CStr(definition(2)))
                     Set el.lineStyle = lineStyle
                     pending.Add el
@@ -183,6 +193,7 @@ NextRow:
 
     For i = 1 To count
         Set pointCircle = CreateEllipseElement2(Nothing, pts(i), 0.08, 0.08, Matrix3dIdentity, msdFillModeNotFilled)
+        If Not featurePoint(i) Then ElementAndmed.Store pointCircle, "PUNKT", codes(i), Array(pointNumbers(i))
         pending.Add pointCircle
         pendingLevels.Add "MOOTMPUNKT"
 
@@ -326,7 +337,7 @@ Private Function FindFont(ByVal name As String) As Font
     Set FindFont = fontItem
 End Function
 
-Private Function FindLineStyle(ByVal name As String) As lineStyle
+Public Function FindLineStyle(ByVal name As String) As lineStyle
     Dim style As lineStyle
     On Error Resume Next
     If IsNumeric(name) Then
@@ -349,7 +360,7 @@ Private Function FindLineStyle(ByVal name As String) As lineStyle
     Set FindLineStyle = style
 End Function
 
-Private Function ReadCodeTable(ByVal path As String) As Object
+Public Function ReadCodeTable(ByVal path As String) As Object
     Dim table As Object, rows As Variant, parts As Variant
     Dim row As String, separator As String, code As String, itemType As String
     Dim n As Long, fieldCount As Long, cellScale As Double
@@ -403,7 +414,7 @@ Private Function Number(ByVal value As String, ByVal row As Long) As Double
     Number = Val(value)
 End Function
 
-Private Function EnsureLevel(ByVal name As String) As Level
+Public Function EnsureLevel(ByVal name As String) As Level
     Dim lev As Level
     On Error Resume Next
     Set lev = ActiveDesignFile.Levels(name)
@@ -415,7 +426,7 @@ Private Function EnsureLevel(ByVal name As String) As Level
     Set EnsureLevel = lev
 End Function
 
-Private Sub ApplyLevel(ByVal el As Element, ByVal lev As Level)
+Public Sub ApplyLevel(ByVal el As Element, ByVal lev As Level)
     Dim children As ElementEnumerator, child As Element
     Set el.Level = lev
     el.Color = -1 ' ByLevel, including nested cell components.
@@ -429,8 +440,9 @@ Private Sub ApplyLevel(ByVal el As Element, ByVal lev As Level)
     End If
 End Sub
 
-Private Function PickFile(ByVal title As String, ByVal label As String, ByVal pattern As String, ByVal folder As String) As String
+Public Function PickFile(ByVal title As String, ByVal label As String, ByVal pattern As String, ByVal folder As String, Optional ByVal save As Boolean = False) As String
     Dim info As OpenFileInfo, buffer As String, filter As String, result As Long
+    Dim extension As String
     buffer = String$(32768, vbNullChar)
     filter = label & vbNullChar & pattern & vbNullChar & vbNullChar
     info.size = LenB(info)
@@ -442,7 +454,15 @@ Private Function PickFile(ByVal title As String, ByVal label As String, ByVal pa
     info.title = StrPtr(title)
     If Len(folder) > 0 Then info.initialDir = StrPtr(folder)
     info.flags = &H80000 Or &H1000 Or &H800 Or &H8
-    If GetOpenFileNameW(info) <> 0 Then
+    If save Then
+        extension = "txt"
+        info.defaultExtension = StrPtr(extension)
+        info.flags = &H80000 Or &H800 Or &H8 Or &H2
+        result = GetSaveFileNameW(info)
+    Else
+        result = GetOpenFileNameW(info)
+    End If
+    If result <> 0 Then
         PickFile = Left$(buffer, InStr(buffer, vbNullChar) - 1)
     Else
         result = CommDlgExtendedError()

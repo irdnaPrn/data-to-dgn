@@ -69,6 +69,7 @@ Public Sub JoinPair(ByVal firstLine As Element, ByVal secondLine As Element)
 
     ' The first selected element supplies the non-geometric attributes.
     Set joined = CreateLineElement1(firstLine, joinedPoints)
+    PreservePointNumbers firstLine, secondLine, joined, stepFirst = 1, stepSecond = 1, bestDistance = 0
     Set firstBackup = firstLine.Clone
     Set secondBackup = secondLine.Clone
     ActiveModelReference.AddElement joined
@@ -101,6 +102,31 @@ Failed:
     End If
     On Error GoTo 0
     Err.Raise vbObjectError + 41, "JoonteYhendamine.JoinPair", errorText & rollbackText
+End Sub
+
+Private Sub PreservePointNumbers(ByVal first As Element, ByVal second As Element, ByVal joined As Element, _
+    ByVal firstForward As Boolean, ByVal secondForward As Boolean, ByVal sharedEnd As Boolean)
+    Dim firstNumbers As Variant, secondNumbers As Variant, numbers As Variant, used As Object
+    Dim firstKind As String, secondKind As String, firstCode As String, secondCode As String
+    Dim firstStored As Boolean, secondStored As Boolean, points() As Point3d
+    firstStored = ElementAndmed.ReadData(first, firstKind, firstCode, firstNumbers)
+    secondStored = ElementAndmed.ReadData(second, secondKind, secondCode, secondNumbers)
+    If Not firstStored And Not secondStored Then Exit Sub
+    Set used = ElementAndmed.UsedNumbers
+    points = first.AsLineElement.GetVertices
+    If Not firstStored Then
+        firstNumbers = ElementAndmed.NewNumbers(UBound(points) - LBound(points) + 1, used)
+    ElseIf firstKind <> "JOON" Or UBound(firstNumbers) - LBound(firstNumbers) <> UBound(points) - LBound(points) Then
+        Err.Raise vbObjectError + 42, , "Esimese joone punktiseos ei vasta tippudele."
+    End If
+    points = second.AsLineElement.GetVertices
+    If Not secondStored Then
+        secondNumbers = ElementAndmed.NewNumbers(UBound(points) - LBound(points) + 1, used)
+    ElseIf secondKind <> "JOON" Or UBound(secondNumbers) - LBound(secondNumbers) <> UBound(points) - LBound(points) Then
+        Err.Raise vbObjectError + 43, , "Teise joone punktiseos ei vasta tippudele."
+    End If
+    numbers = ElementAndmed.JoinNumbers(firstNumbers, secondNumbers, firstForward, secondForward, sharedEnd)
+    ElementAndmed.Store joined, "JOON", firstCode, numbers
 End Sub
 
 Private Function DistanceSquared(ByRef firstPoint As Point3d, ByRef secondPoint As Point3d) As Double

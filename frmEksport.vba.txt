@@ -1,0 +1,192 @@
+Option Explicit
+
+Private WithEvents mGroups As MSForms.ListBox
+Private WithEvents mAll As MSForms.CommandButton
+Private WithEvents mNone As MSForms.CommandButton
+Private WithEvents mAssign As MSForms.CommandButton
+Private WithEvents mSave As MSForms.CommandButton
+Private WithEvents mScreen As MSForms.CommandButton
+Private WithEvents mEhr As MSForms.CommandButton
+Private WithEvents mClose As MSForms.CommandButton
+Private mTarget As MSForms.ComboBox
+Private mFields(0 To 4) As MSForms.CheckBox
+Private mOutput As MSForms.TextBox
+Private mStatus As MSForms.Label
+Private mTable As Object, mRecords As Collection
+
+Private Sub UserForm_Initialize()
+    Dim label As Object, i As Long, names As Variant
+    Me.Caption = "Elementide eksport"
+    Me.Width = 730: Me.Height = 590
+    Set label = TooriistaAknad.Control(Me, "Label", "lblCodes", 12, 10, 680, 18, "Kood | Info / level / nimi | Elemente | Punkte")
+    Set mGroups = TooriistaAknad.Control(Me, "ListBox", "lstCodes", 12, 31, 690, 165)
+    mGroups.MultiSelect = fmMultiSelectMulti
+    mGroups.ColumnCount = 5
+    mGroups.ColumnWidths = "0 pt;55 pt;465 pt;65 pt;65 pt"
+    Set mAll = TooriistaAknad.Control(Me, "CommandButton", "cmdAll", 12, 204, 90, 24, "Vali koik")
+    Set mNone = TooriistaAknad.Control(Me, "CommandButton", "cmdNone", 110, 204, 90, 24, "Tyhjenda valik")
+    Set mTarget = TooriistaAknad.Control(Me, "ComboBox", "cboCode", 216, 204, 360, 24)
+    mTarget.Style = fmStyleDropDownList
+    mTarget.ColumnCount = 2
+    mTarget.ColumnWidths = "45 pt;285 pt"
+    Set mAssign = TooriistaAknad.Control(Me, "CommandButton", "cmdAssign", 585, 204, 117, 24, "Maara kood")
+    Set mStatus = TooriistaAknad.Control(Me, "Label", "lblStatus", 12, 238, 690, 28)
+    names = Array("pnr", "x", "y", "z", "kood")
+    For i = 0 To 4
+        Set mFields(i) = TooriistaAknad.Control(Me, "CheckBox", "chk" & CStr(i), 12 + i * 62, 273, 58, 20, CStr(names(i)))
+        mFields(i).Value = True
+    Next i
+    Set mSave = TooriistaAknad.Control(Me, "CommandButton", "cmdSave", 12, 303, 125, 27, "Salvesta faili")
+    Set mScreen = TooriistaAknad.Control(Me, "CommandButton", "cmdScreen", 147, 303, 125, 27, "Too ekraanile")
+    Set mEhr = TooriistaAknad.Control(Me, "CommandButton", "cmdEhr", 282, 303, 80, 27, "Ehr")
+    Set mClose = TooriistaAknad.Control(Me, "CommandButton", "cmdClose", 612, 303, 90, 27, "Sulge")
+    mClose.Cancel = True
+    Set mOutput = TooriistaAknad.Control(Me, "TextBox", "txtOutput", 12, 342, 690, 200)
+    mOutput.MultiLine = True
+    mOutput.ScrollBars = fmScrollBarsBoth
+    mOutput.WordWrap = False
+    mOutput.Locked = True
+    mOutput.Font.Name = "Courier New"
+    mOutput.Font.Size = 10
+End Sub
+
+Public Sub Configure(ByVal table As Object, ByVal records As Collection, ByVal skipped As Long)
+    Dim key As Variant, definition As Variant
+    Set mTable = table: Set mRecords = records
+    For Each key In table.Keys
+        definition = table(key)
+        mTarget.AddItem CStr(key)
+        mTarget.List(mTarget.ListCount - 1, 1) = CStr(definition(4))
+    Next key
+    RefreshGroups
+    mStatus.Caption = "Leitud elemente: " & records.Count & ". Vali eksporditavad koodid."
+    If skipped > 0 Then mStatus.Caption = mStatus.Caption & " Vahele jaetud kaartega/toetamata elemente: " & skipped & "."
+End Sub
+
+Private Sub RefreshGroups()
+    Dim groups As Object, record As clsElementKirje, key As Variant, data As Variant, info As String, row As Long
+    Set groups = CreateObject("Scripting.Dictionary")
+    For Each record In mRecords
+        key = record.GroupKey
+        If Not groups.Exists(key) Then
+            If Len(record.Issue) > 0 Then
+                info = record.Issue
+            ElseIf Len(record.Code) = 0 Then
+                info = record.MatchInfo & " | " & record.Source.Level.Name & " | " & ElementideEksport.Signature(record.Source)
+            ElseIf mTable.Exists(record.Code) Then
+                data = mTable(record.Code)
+                info = CStr(data(4))
+            Else
+                info = "Kooditabelis puudub"
+            End If
+            groups.Add key, Array(record.Code, info, 0&, 0&)
+        End If
+        data = groups(key)
+        data(2) = CLng(data(2)) + 1
+        data(3) = CLng(data(3)) + record.PointCount
+        groups(key) = data
+    Next record
+    mGroups.Clear
+    For Each key In groups.Keys
+        data = groups(key)
+        mGroups.AddItem CStr(key)
+        row = mGroups.ListCount - 1
+        mGroups.List(row, 1) = CStr(data(0))
+        If Len(CStr(data(0))) = 0 Then mGroups.List(row, 1) = "?"
+        mGroups.List(row, 2) = CStr(data(1))
+        mGroups.List(row, 3) = CStr(data(2))
+        mGroups.List(row, 4) = CStr(data(3))
+    Next key
+    mOutput.Text = ""
+End Sub
+
+Private Function SelectedGroups() As Object
+    Dim result As Object, i As Long
+    Set result = CreateObject("Scripting.Dictionary")
+    For i = 0 To mGroups.ListCount - 1
+        If mGroups.Selected(i) Then result.Add CStr(mGroups.List(i, 0)), True
+    Next i
+    If result.Count = 0 Then Err.Raise vbObjectError + 130, , "Vali vahemalt yks kood voi tuvastamata grupp."
+    Set SelectedGroups = result
+End Function
+
+Private Function SelectedFields() As Variant
+    Dim names As Variant, result() As String, i As Long, count As Long
+    names = Array("pnr", "x", "y", "z", "kood")
+    For i = 0 To 4
+        If mFields(i).Value Then
+            ReDim Preserve result(0 To count)
+            result(count) = CStr(names(i)): count = count + 1
+        End If
+    Next i
+    If count = 0 Then Err.Raise vbObjectError + 131, , "Vali vahemalt yks valjundveerg."
+    SelectedFields = result
+End Function
+
+Private Sub mAll_Click()
+    Dim i As Long
+    For i = 0 To mGroups.ListCount - 1
+        mGroups.Selected(i) = True
+    Next i
+End Sub
+
+Private Sub mNone_Click()
+    Dim i As Long
+    For i = 0 To mGroups.ListCount - 1
+        mGroups.Selected(i) = False
+    Next i
+End Sub
+
+Private Sub mAssign_Click()
+    Dim groups As Object, code As String
+    On Error GoTo Failed
+    Set groups = SelectedGroups
+    If mTarget.ListIndex < 0 Then Err.Raise vbObjectError + 132, , "Vali rippmenyyst omistatav kood."
+    code = CStr(mTarget.List(mTarget.ListIndex, 0))
+    ElementideEksport.AssignCode mRecords, groups, code, mTable
+    RefreshGroups
+    mStatus.Caption = "Kood maaratud. Vali eksporditavad koodid. Seosed salvestatakse valjundi loomisel."
+    Exit Sub
+Failed:
+    MsgBox Err.Description, vbExclamation, "Eksport"
+End Sub
+
+Private Sub mScreen_Click()
+    Dim groups As Object, fields As Variant
+    On Error GoTo Failed
+    Set groups = SelectedGroups: fields = SelectedFields
+    mOutput.Text = ElementideEksport.BuildTable(mRecords, groups, fields, vbTab)
+    mStatus.Caption = "Tabel loodud; punktinumbrid ja koodiseosed on mudelis salvestatud."
+    Exit Sub
+Failed:
+    MsgBox Err.Description, vbExclamation, "Eksport"
+End Sub
+
+Private Sub mSave_Click()
+    Dim groups As Object, fields As Variant, path As String, content As String
+    On Error GoTo Failed
+    Set groups = SelectedGroups: fields = SelectedFields
+    path = ValiImport.PickFile("Salvesta punktid", "Tekstifail (*.txt)", "*.txt", "", True)
+    If Len(path) = 0 Then Exit Sub
+    content = ElementideEksport.BuildTable(mRecords, groups, fields, ",")
+    ElementideEksport.WriteFile path, content
+    mStatus.Caption = "Salvestatud: " & path
+    Exit Sub
+Failed:
+    MsgBox Err.Description, vbExclamation, "Eksport"
+End Sub
+
+Private Sub mEhr_Click()
+    ' Reserved for the future Ehr output; deliberately no action yet.
+End Sub
+
+Private Sub mClose_Click()
+    Me.Hide
+End Sub
+
+Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
+    If CloseMode = vbFormControlMenu Then
+        Cancel = True
+        Me.Hide
+    End If
+End Sub

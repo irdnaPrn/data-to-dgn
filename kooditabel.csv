@@ -1,6 +1,7 @@
 Kood;Info;Tüüp;Leveli nimi;Joone/Celli nimi;Skaala
 1;polla;CELL;ALUSVORK;KOHPP;0.5
 2;käigupunkt;CELL;ALUSVORK;SPYMAR;0.5
+5;hoone detail;JOON;HOONEDET;HOONEKP;
 6;Hoone põhikontuur;JOON;HOONE;HOONEKP;
 7;kõrgus;CELL;KORGUS-EH2000;RING02;1.0
 10;katusealune;JOON;HOONE;KATUSEALL;
@@ -17,3 +18,6 @@ Kood;Info;Tüüp;Leveli nimi;Joone/Celli nimi;Skaala
 166;kõlvik;JOON;HALJASTUS;KOLVIK;
 148;põõsas;CELL;HALJASTUS;PQQSAS;0.5
 50;veepiir;JOON;VEEKOGU;VEEPIIR;
+143;võrkaed;JOON;AED;VO_AED;0.5
+100;rajatis pidevjoon;JOON;RAJATIS;RAJATISP;
+k;koordinaatpunkt;CELL;KOORDPUNKT;KOORDP;0.5
