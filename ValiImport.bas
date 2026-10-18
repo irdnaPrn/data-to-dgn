@@ -58,7 +58,7 @@ Public Sub Import()
     Dim textPoint As Point3d, heightPoint As Point3d
     Dim heightValue As String
     Dim message As String, definition As Variant
-    Dim codeTable As Object, codeCounts As Object
+    Dim codeTable As Object, codeCounts As Object, missingCells As Object
     Dim firstRowChecked As Boolean, separatorSpecified As Boolean
     On Error GoTo Failed
     path = PickFile("Vali punktifail", "Punktifailid (*.txt;*.csv)", "*.txt;*.csv", "")
@@ -124,11 +124,12 @@ Public Sub Import()
 NextRow:
     Next n
     If count = 0 Then Err.Raise vbObjectError + 7, , "Punktifail on tuhi."
-    If Not ConfirmImport(codeCounts, codeTable, count) Then Exit Sub
+    AttachCellLibrary lib
+    Set missingCells = FindMissingCells(codeCounts, codeTable, AvailableCellNames())
+    If Not ConfirmImport(codeCounts, codeTable, count, missingCells) Then Exit Sub
     ReDim featurePoint(1 To count)
 
     ' Build every element before adding any geometry to the model.
-    AttachCellLibrary lib
     i = 1
     Do While i <= count
         If Not codeTable.Exists(codes(i)) Then
@@ -136,6 +137,11 @@ NextRow:
         Else
             definition = codeTable(codes(i))
             If definition(0) = "CELL" Then
+                If missingCells.Exists(CStr(definition(2))) Then
+                    ' Keep the point and its source number; omit only the missing symbol.
+                    i = i + 1
+                    GoTo NextFeature
+                End If
                 Set cell = CreateCellElement2(definition(2), pts(i), Point3dFromXYZ(CDbl(definition(3)), CDbl(definition(3)), 1), True, Matrix3dIdentity)
                 ElementAndmed.Store cell, "CELL", codes(i), Array(pointNumbers(i))
                 featurePoint(i) = True
@@ -189,6 +195,7 @@ NextRow:
                 End If
             End If
         End If
+NextFeature:
     Loop
 
     For i = 1 To count
@@ -239,23 +246,62 @@ Failed:
     MsgBox "Import katkestati: " & message, vbExclamation, "ValiImport"
 End Sub
 
-Private Function ConfirmImport(ByVal codeCounts As Object, ByVal codeTable As Object, ByVal pointCount As Long) As Boolean
+Private Function AvailableCellNames() As Object
+    Dim names As Object, cells As CellInformationEnumerator
+    Set names = CreateObject("Scripting.Dictionary")
+    names.CompareMode = 1
+    Set cells = GetCellInformationEnumerator(True, False)
+    Do While cells.MoveNext
+        names(CStr(cells.Current.Name)) = True
+    Loop
+    Set AvailableCellNames = names
+End Function
+
+Private Function FindMissingCells(ByVal codeCounts As Object, ByVal codeTable As Object, ByVal available As Object) As Object
+    Dim missing As Object, key As Variant, definition As Variant, name As String
+    Set missing = CreateObject("Scripting.Dictionary")
+    missing.CompareMode = 1
+    For Each key In codeCounts.Keys
+        If codeTable.Exists(key) Then
+            definition = codeTable(key)
+            If CStr(definition(0)) = "CELL" Then
+                name = CStr(definition(2))
+                If Not available.Exists(name) Then missing(name) = True
+            End If
+        End If
+    Next key
+    Set FindMissingCells = missing
+End Function
+
+Private Function PreviewInfo(ByVal code As String, ByVal codeTable As Object, ByVal missingCells As Object) As String
+    Dim definition As Variant, infoText As String
+    If Not codeTable.Exists(code) Then
+        PreviewInfo = "KOOD PUUDUB!"
+        Exit Function
+    End If
+    definition = codeTable(code)
+    infoText = CStr(definition(4))
+    If CStr(definition(0)) = "CELL" Then
+        If missingCells.Exists(CStr(definition(2))) Then
+            If Len(infoText) > 0 Then infoText = infoText & " | "
+            infoText = infoText & "CELL PUUDUB: " & CStr(definition(2))
+        End If
+    End If
+    PreviewInfo = infoText
+End Function
+
+Private Function ConfirmImport(ByVal codeCounts As Object, ByVal codeTable As Object, ByVal pointCount As Long, ByVal missingCells As Object) As Boolean
     Dim pages As New Collection
     Dim codeKey As Variant, codeLabel As String, entry As String, pageText As String
     Dim pageIndex As Long, pageRows As Long, prompt As String, buttonCaption As String
-    Dim definition As Variant, infoText As String
+    Dim infoText As String
 
     ' Keep each dialog short enough to display the complete code list.
     For Each codeKey In codeCounts.Keys
         codeLabel = CStr(codeKey)
         If Len(codeLabel) = 0 Then codeLabel = "(tuhi)"
         entry = codeLabel & " | " & CStr(codeCounts(codeKey))
-        If codeTable.Exists(codeKey) Then
-            definition = codeTable(codeKey)
-            infoText = CStr(definition(4))
-        Else
-            infoText = "kood puudub"
-        End If
+        infoText = PreviewInfo(CStr(codeKey), codeTable, missingCells)
         entry = entry & " | " & infoText
         If Len(pageText) > 0 Then
             If Len(pageText) + Len(entry) + 2 > 750 Or pageRows >= 20 Then
@@ -273,6 +319,7 @@ Private Function ConfirmImport(ByVal codeCounts As Object, ByVal codeTable As Ob
     For pageIndex = 1 To pages.count
         If pageIndex = pages.count Then
             buttonCaption = "Import"
+            If missingCells.Count > 0 Then buttonCaption = "Impordi"
         Else
             buttonCaption = "Edasi"
         End If

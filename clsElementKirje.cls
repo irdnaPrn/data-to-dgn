@@ -17,6 +17,8 @@ Public PointCount As Long
 Public MatchInfo As String
 Public NeedsWrite As Boolean
 Public Issue As String
+Public LevelName As String
+Public ElementName As String
 
 Public Function GroupKey() As String
     If Len(Issue) > 0 Then
@@ -24,6 +26,6 @@ Public Function GroupKey() As String
     ElseIf Len(Code) > 0 Then
         GroupKey = "K:" & Code
     Else
-        GroupKey = "?:" & Kind & vbTab & Source.Level.Name & vbTab & ElementideEksport.Signature(Source)
+        GroupKey = "?:" & Kind & vbTab & LevelName & vbTab & ElementName
     End If
 End Function

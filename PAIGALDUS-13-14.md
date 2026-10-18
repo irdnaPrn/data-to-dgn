@@ -12,7 +12,7 @@ See täiendus lisab kaks käsku olemasolevasse **Default.mvba** projekti. Nuppe 
    - `ElementideAsetamine.bas`
    - `ElementideEksport.bas`
 4. Olemasolevad `KorgusePooramine`, `clsRotateHeight` ja `clsJoinLines` jäävad vajalikuks.
-5. Lisa **Insert → Class Module** kaudu kaks klassi. Määra F4 aknas `(Name)` täpselt **clsPlaceFeature** ja **clsElementKirje**. Kopeeri vastavast `.cls` failist sisu **alates `Option Explicit` reast**. Faili alguses olevaid `VERSION`, `BEGIN`, `END` ja `Attribute` ridu ära kopeeri. Mõlemad peavad asuma **Class Modules** all.
+5. Impordi **File → Import File** kaudu `clsPlaceFeature.cls` ja `clsElementKirje.cls`. Klassifailid on Windowsi CRLF-reavahetustega, mille puhul kasutaja kinnitas õiget importimist **Class Modules** alla. Kui mõni redaktor on faili LF-vormingusse teisendanud, määra Notepad++ menüüs **Edit → EOL Conversion → Windows (CR LF)** ja salvesta enne importi. Alternatiivina lisa **Insert → Class Module**, määra F4 aknas `(Name)` vastav nimi ja kopeeri failist sisu **alates `Option Explicit` reast** (ilma `VERSION`, `BEGIN`, `END` ja `Attribute` päiseta).
 6. Lisa **Insert → UserForm** kaudu kaks tühja vormi. Määra F4 aknas `(Name)` täpselt **frmAsetamine** ja **frmEksport**. Ava kummagi vormi kood **F7** abil ning asenda kogu vaikekood vastava faili sisuga:
    - `frmAsetamine.vba.txt`
    - `frmEksport.vba.txt`
@@ -33,6 +33,16 @@ Eksport:
 ```text
 VBA RUN [Default]ElementideEksport.Start
 ```
+
+Ainult **KOORDP** koordinaatpunktide ekspordiks, ka varasemast või teise tööriistaga tehtud joonisest:
+
+```text
+VBA RUN [Default]ElementideEksport.Koordp
+```
+
+See käsk otsib aktiivsest mudelist ainult tavalisi ja shared-celle nimega `KOORDP`. Tabelis on vastav kood praegu `k`. Kui celli päisel level puudub või cell asub teisel levelil, kasutatakse KOORDP nime ainsat vastet kooditabelis. Mitut vastet ei valita automaatselt. Cellilt eksporditakse origini koordinaadid. Olemasolev salvestatud `pnr` säilib; seoseta cell saab esimesel väljundi loomisel püsiva numbri.
+
+Selle paranduse paigaldamiseks uuenda **ElementideEksport.bas**, **clsElementKirje.cls** ja **frmEksport** vormi kood failist `frmEksport.vba.txt`; siis **Debug → Compile** ja salvesta projekt. Klass ja vorm tuleb uuendada koos mooduliga, sest leveli ja elemendi nime hoitakse nüüd kirje küljes.
 
 Kui toolbox vajab projekti eelnevat laadimist, kasuta nupu all ühte rida, näiteks:
 
@@ -73,6 +83,8 @@ Käsk loeb aktiivset mudelit, sealhulgas peidetud levelitel olevaid elemente; vi
 
 Fail on päisega UTF-8 TXT, komaeraldusega ja punktiga kümnenderaldajana. Ekraanil on kopeeritav tabel tabulaatoritega. X on põhjasuund, Y idasuund; koordinaadid võetakse praegusest geomeetriast ja väljastatakse kolme komakohaga. Märkusega kuues veerg ei kuulu eksporti. Kõigi viie veeruga väljund sobib impordi sisendiks; joonegruppide eraldamiseks pole väljundis eraldi joone ID veergu.
 
+Kui varasema või teise tööriistaga tehtud joonise joonestiili objekt ei ole loetav, jääb element loendisse käsitsi koodi määramiseks. Puuduvat stiili ei asendata oletuslikult stiiliga 0. Nimetu, kuid olemasoleva standardstiili puhul kasutatakse selle numbrit 0–7. Ühe vigase elemendi lugemine ei katkesta ülejäänud mudeli läbivaatust. Vahele jäetud vigaste/toetamata elementide arv näidatakse aknas; vea etapp ja elemendi ID väljastatakse VBA Immediate-aknasse (Ctrl+G). Ka levelita cellile saab väljundi loomisel salvestada punktiseose; leveli puudumine ei võrdu lukustusega.
+
 Numbrid ja uued koodiseosed kirjutatakse mudelisse väljundi loomisel, ka ekraanile toomisel. Ainult akna avamine või **Määra kood** ei kirjuta neid veel mudelisse. Failidialoogi katkestamine ei loo väljundit ega salvesta uusi seoseid. Lukustatud elemendi või leveli korral peab uue seose salvestamiseks lukustuse vabastama. DGN tuleb pärast muudatusi tavapäraselt salvestada.
 
 Kaared ja kõveratega complex-elemendid jäetakse välja; nende arv näidatakse aknas. Kui seotud joone tippude arv on vahepeal muutunud, näidatakse seda eraldi veaga grupina: teiste koodide eksport jääb võimalikuks, selle elemendi väljund peatatakse vale `pnr` omistamise vältimiseks. Algse seose taastamiseks tuleb taastada vastav tipujärjestus või element uuesti importida. Seos jälgib tippude järjestust: väljaspool meie ühendamiskäsku tehtud tippude ümberjärjestamine vajab samuti punktiseoste uuendamist.
@@ -83,6 +95,9 @@ Automaatkontrollid ei käivita PowerDrafti ega muuda kasutaja DGN-e:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_point_data.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_export_signature.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_koordp_scan.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_import_preview.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_join_geometry.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_rotation_geometry.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_v8i_api.ps1

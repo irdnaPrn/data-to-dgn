@@ -7,7 +7,7 @@ Kood;Info;Tüüp;Leveli nimi;Joone/Celli nimi;Skaala
 10;katusealune;JOON;HOONE;KATUSEALL;
 22;äärekivi;JOON;TEE;AAREKIVI;
 18;püsikattega tee;JOON;TEE;ASFBET;
-20;siirdkattega tee;JOON;TEE;KRUUSKILL;
+20;siirdkattega tee;JOON;TEE;KRUUSKILL;1.0
 24;pinnastee;JOON;TEE;PINNASTEE;
 200;kan.kaev;CELL;KKAEV;KAKAEV;0.5
 201;restkaev;CELL;SKKAEV;REKAEV;0.5
@@ -21,3 +21,6 @@ Kood;Info;Tüüp;Leveli nimi;Joone/Celli nimi;Skaala
 143;võrkaed;JOON;AED;VO_AED;0.5
 100;rajatis pidevjoon;JOON;RAJATIS;RAJATISP;
 k;koordinaatpunkt;CELL;KOORDPUNKT;KOORDP;0.5
+911;madalpingekaabel;JOON;MPKAABEL;MP_KBL;1.0
+16;kõrgus hoone det;CELL;HOONEDET;RTKQRG;0.5
+194;õhutusava;CELL;TORUMP;QHUJUH;0.5

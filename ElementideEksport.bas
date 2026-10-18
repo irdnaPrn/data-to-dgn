@@ -2,89 +2,174 @@ Attribute VB_Name = "ElementideEksport"
 Option Explicit
 
 Public Sub Start()
+    OpenExport False
+End Sub
+
+Public Sub Koordp()
+    OpenExport True
+End Sub
+
+Private Sub OpenExport(ByVal onlyKoordp As Boolean)
     Dim table As Object, records As Collection, dialog As frmEksport, skipped As Long
+    Dim stage As String
     On Error GoTo Failed
+    stage = "kooditabeli lugemine"
     Set table = TooriistaAknad.CodeTable
     If table Is Nothing Then Exit Sub
-    Set records = ScanModel(table, skipped)
+    stage = "aktiivse mudeli lugemine"
+    Set records = ScanModel(table, skipped, onlyKoordp)
     If records.Count = 0 Then
-        MsgBox "Eksporditavaid celle ega sirgete loikudega jooni ei leitud.", vbInformation, "Eksport"
+        If onlyKoordp Then
+            MsgBox "Loetavaid KOORDP celle ei leitud. Vahele jaetud: " & skipped, vbInformation, "Eksport"
+        Else
+            MsgBox "Eksporditavaid celle ega sirgete loikudega jooni ei leitud. Vahele jaetud: " & skipped, vbInformation, "Eksport"
+        End If
         Exit Sub
     End If
+    stage = "ekspordiakna loomine"
     Set dialog = New frmEksport
+    stage = "ekspordi loendi koostamine"
     dialog.Configure table, records, skipped
+    stage = "ekspordiakna avamine"
     dialog.Show vbModal
     Unload dialog
     Exit Sub
 Failed:
-    MsgBox "Eksport ebaonnestus: " & Err.Description, vbExclamation, "Eksport"
+    MsgBox "Eksport ebaonnestus (" & stage & "): " & Err.Description, vbExclamation, "Eksport"
 End Sub
 
-Private Function ScanModel(ByVal table As Object, ByRef skipped As Long) As Collection
+Private Function ScanModel(ByVal table As Object, ByRef skipped As Long, ByVal onlyKoordp As Boolean) As Collection
     Dim records As New Collection, scan As ElementEnumerator, criteria As New ElementScanCriteria
-    Dim el As Element, record As clsElementKirje, kind As String, points() As Point3d
-    Dim storedKind As String, code As String, numbers As Variant, matches As Collection
+    Dim el As Element, record As clsElementKirje, reason As String
     ' Only top-level geometric features, never a cell's constituent graphics.
     criteria.ExcludeAllTypes
     criteria.IncludeType msdElementTypeCellHeader
     criteria.IncludeType msdElementTypeSharedCell
-    criteria.IncludeType msdElementTypeLine
-    criteria.IncludeType msdElementTypeLineString
-    criteria.IncludeType msdElementTypeShape
-    criteria.IncludeType msdElementTypeComplexString
-    criteria.IncludeType msdElementTypeComplexShape
-    criteria.IncludeType msdElementTypeEllipse
+    If Not onlyKoordp Then
+        criteria.IncludeType msdElementTypeLine
+        criteria.IncludeType msdElementTypeLineString
+        criteria.IncludeType msdElementTypeShape
+        criteria.IncludeType msdElementTypeComplexString
+        criteria.IncludeType msdElementTypeComplexShape
+        criteria.IncludeType msdElementTypeEllipse
+    End If
     Set scan = ActiveModelReference.Scan(criteria)
     Do While scan.MoveNext
         Set el = scan.Current
-        If el.IsComponentElement Then GoTo NextElement
-        ' Old importer marker circles have no stored point association: skip them.
-        If el.IsEllipseElement And Not ElementAndmed.HasData(el) Then GoTo NextElement
-        If Not GetPoints(el, points, kind) Then
+        Set record = ReadRecord(el, table, onlyKoordp, reason)
+        If Not record Is Nothing Then
+            records.Add record
+        ElseIf Len(reason) > 0 Then
             skipped = skipped + 1
-            GoTo NextElement
+            Debug.Print reason
         End If
-        Set record = New clsElementKirje
-        Set record.Source = el
-        record.Kind = kind
-        record.PointCount = UBound(points) - LBound(points) + 1
-        If ElementAndmed.ReadData(el, storedKind, code, numbers) Then
-            If storedKind <> kind Or UBound(numbers) - LBound(numbers) + 1 <> record.PointCount Then
-                record.Issue = "Elemendi " & DLongToString(el.ID) & _
-                    " tippude arv voi tuup on muutunud; salvestatud punktinumbreid ei saa kindlalt siduda."
-            End If
-            record.Code = code
-            record.Numbers = numbers
-        Else
-            record.NeedsWrite = True
-        End If
-        If Len(record.Code) = 0 And kind <> "PUNKT" Then
-            Set matches = MatchCodes(table, kind, el.Level.Name, Signature(el))
-            If matches.Count = 1 Then
-                record.Code = CStr(matches(1))
-                record.NeedsWrite = True
-            ElseIf matches.Count = 0 Then
-                record.MatchInfo = "Kood puudub"
-            Else
-                record.MatchInfo = "Mitu vastet: " & JoinCollection(matches, ", ")
-            End If
-        End If
-        records.Add record
-NextElement:
     Loop
     Set ScanModel = records
 End Function
 
+Private Function ReadRecord(ByVal el As Element, ByVal table As Object, ByVal onlyKoordp As Boolean, ByRef reason As String) As clsElementKirje
+    Dim record As clsElementKirje, points() As Point3d, kind As String, lev As Level
+    Dim storedKind As String, code As String, numbers As Variant, matches As Collection
+    Dim stage As String, elementId As String, name As String
+    reason = ""
+    On Error GoTo Failed
+    stage = "elemendi lugemine"
+    If el Is Nothing Then Err.Raise vbObjectError + 140, , "Mudeli skannimine tagastas tyhja elemendi."
+    elementId = DLongToString(el.ID)
+    If el.IsComponentElement Then Exit Function
+    If onlyKoordp Then
+        If Not el.IsCellElement And Not el.IsSharedCellElement Then Exit Function
+        name = Signature(el)
+        If StrComp(name, "KOORDP", vbTextCompare) <> 0 Then Exit Function
+    End If
+    ' Old importer marker circles have no association: do not export duplicates.
+    If el.IsEllipseElement And Not ElementAndmed.HasData(el) Then Exit Function
+    stage = "koordinaatide lugemine"
+    If Not GetPoints(el, points, kind) Then
+        reason = "Element " & elementId & ": toetamata geomeetria."
+        Exit Function
+    End If
+    Set record = New clsElementKirje
+    Set record.Source = el
+    record.Kind = kind
+    record.PointCount = UBound(points) - LBound(points) + 1
+    stage = "punktiseose lugemine"
+    If ElementAndmed.ReadData(el, storedKind, code, numbers) Then
+        If storedKind <> kind Or UBound(numbers) - LBound(numbers) + 1 <> record.PointCount Then
+            record.Issue = "Elemendi " & elementId & _
+                " tippude arv voi tuup on muutunud; salvestatud punktinumbreid ei saa kindlalt siduda."
+        End If
+        record.Code = code
+        record.Numbers = numbers
+    Else
+        record.NeedsWrite = True
+    End If
+    stage = "leveli lugemine"
+    Set lev = el.Level
+    If Not lev Is Nothing Then record.LevelName = lev.Name
+    stage = "elemendi nime lugemine"
+    record.ElementName = Signature(el)
+    If Len(record.Code) = 0 And kind <> "PUNKT" Then
+        stage = "koodi tuvastamine"
+        Set matches = MatchCodes(table, kind, record.LevelName, record.ElementName)
+        ' KOORDP identifies a coordinate marker even when an older drawing has
+        ' no header level, or keeps these cells on another level.
+        If matches.Count = 0 And kind = "CELL" Then
+            If StrComp(record.ElementName, "KOORDP", vbTextCompare) = 0 Then
+                Set matches = MatchKoordpCodes(table)
+            End If
+        End If
+        If matches.Count = 1 Then
+            record.Code = CStr(matches(1))
+            record.NeedsWrite = True
+        ElseIf matches.Count = 0 Then
+            record.MatchInfo = "KOOD PUUDUB!"
+        Else
+            record.MatchInfo = "Mitu vastet: " & JoinCollection(matches, ", ")
+        End If
+    End If
+    Set ReadRecord = record
+    Exit Function
+Failed:
+    reason = "Element " & elementId & " (" & stage & "): " & Err.Description
+    Set ReadRecord = Nothing
+End Function
+
+Public Function MatchKoordpCodes(ByVal table As Object) As Collection
+    Dim matches As New Collection, key As Variant, definition As Variant
+    For Each key In table.Keys
+        definition = table(key)
+        If CStr(definition(0)) = "CELL" And StrComp(CStr(definition(2)), "KOORDP", vbTextCompare) = 0 Then matches.Add CStr(key)
+    Next key
+    Set MatchKoordpCodes = matches
+End Function
+
+Private Function LevelLocked(ByVal el As Element) As Boolean
+    Dim lev As Level
+    Set lev = el.Level
+    If Not lev Is Nothing Then LevelLocked = lev.IsLocked
+End Function
+
 Public Function Signature(ByVal el As Element) As String
+    Dim style As LineStyle, lev As Level
+    If el Is Nothing Then Err.Raise vbObjectError + 141, , "Elemendi objekti ei leitud."
     If el.IsCellElement Then
         Signature = el.AsCellElement.Name
     ElseIf el.IsSharedCellElement Then
         Signature = el.AsSharedCellElement.Name
     ElseIf Not el.IsEllipseElement Then
         If el.LineStyleSource = msdValueSourceLevel Then
-            Signature = el.Level.ElementLineStyle.Name
+            Set lev = el.Level
+            If Not lev Is Nothing Then Set style = lev.ElementLineStyle
         Else
-            Signature = el.LineStyle.Name
+            Set style = el.LineStyle
+        End If
+        ' Older/external drawings may not resolve a style object. Keep the
+        ' element available for manual code assignment; never invent a style.
+        If style Is Nothing Then Exit Function
+        Signature = style.Name
+        If Len(Signature) = 0 Then
+            If style.Number >= 0 And style.Number <= 7 Then Signature = CStr(style.Number)
         End If
     End If
 End Function
@@ -152,7 +237,7 @@ End Function
 
 Public Sub AssignCode(ByVal records As Collection, ByVal groups As Object, ByVal code As String, ByVal table As Object)
     Dim record As clsElementKirje, definition As Variant
-    If Not table.Exists(code) Then Err.Raise vbObjectError + 121, , "Kood puudub kooditabelis: " & code
+    If Not table.Exists(code) Then Err.Raise vbObjectError + 121, , "KOOD PUUDUB! Kooditabelis ei ole koodi: " & code
     definition = table(code)
     ' Validate every selected group before changing any in-memory record.
     For Each record In records
@@ -182,8 +267,8 @@ Public Function BuildTable(ByVal records As Collection, ByVal groups As Object, 
             If Len(record.Code) = 0 Then Err.Raise vbObjectError + 123, , "Maara esmalt valitud elementide puuduv voi mitmene kood."
             If record.Source.ModelReference.MdlModelRefP <> modelRef Then Err.Raise vbObjectError + 124, , "Aktiivne mudel on muutunud. Ava ekspordiaken uuesti."
             If record.NeedsWrite Or IsEmpty(record.Numbers) Then
-                If record.Source.IsLocked Or record.Source.Level.IsLocked Then _
-                    Err.Raise vbObjectError + 125, , "Punktiseose salvestamiseks vabasta elemendi voi leveli lukustus: " & record.Source.Level.Name
+                If record.Source.IsLocked Or LevelLocked(record.Source) Then _
+                    Err.Raise vbObjectError + 125, , "Punktiseose salvestamiseks vabasta elemendi voi leveli lukustus: " & record.LevelName
             End If
             selected.Add record
         End If

@@ -15,3 +15,6 @@
 12. Esimene hiire klõps kõrguse valimine, sealt jääb joon "hiire külge". Joon peaks ALGUSES olema alati horisontaalne, siis saab teksti täpselt pöörata. Kui valin teksti, hiire klõps satub näiteks teksti allaossa, siis ei pole abijoonest tolku.
 13. Cellide, joonte asetamine plaanie. Menüü: Leveli järgi, Levelite all vastavad jooned ja cellid. Nimekirjast teen valiku ja asetan dgn-i. Igal elemendil indeks e. järjekorra nr.
 14. Plaanil olevate elementide andmete (indeks, x, y, z, kood) export tabelina ekraanile või txt faili.
+15. Puuduva CELLI puhul importi mitte katkestda, kuvada puuduva CELLI-i nimi ja valikud Impordi ja Katkesta.
+16. Muutsin Notepad++ OEL Conversion Windows. Class modules import nüüd ok.
+17. Puuduva koodi puhul veateade suurte tähtedega, et paistaks silma. Seda muutsin koodis, kuid järgmises versioonis jälle algne. Veateade: "KOOD PUUDUB!".

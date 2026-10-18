@@ -60,7 +60,7 @@ Public Sub Configure(ByVal table As Object, ByVal records As Collection, ByVal s
     Next key
     RefreshGroups
     mStatus.Caption = "Leitud elemente: " & records.Count & ". Vali eksporditavad koodid."
-    If skipped > 0 Then mStatus.Caption = mStatus.Caption & " Vahele jaetud kaartega/toetamata elemente: " & skipped & "."
+    If skipped > 0 Then mStatus.Caption = mStatus.Caption & " Vahele jaetud vigaseid/toetamata elemente: " & skipped & "."
 End Sub
 
 Private Sub RefreshGroups()
@@ -72,12 +72,12 @@ Private Sub RefreshGroups()
             If Len(record.Issue) > 0 Then
                 info = record.Issue
             ElseIf Len(record.Code) = 0 Then
-                info = record.MatchInfo & " | " & record.Source.Level.Name & " | " & ElementideEksport.Signature(record.Source)
+                info = record.MatchInfo & " | " & record.LevelName & " | " & record.ElementName
             ElseIf mTable.Exists(record.Code) Then
                 data = mTable(record.Code)
                 info = CStr(data(4))
             Else
-                info = "Kooditabelis puudub"
+                info = "KOOD PUUDUB!"
             End If
             groups.Add key, Array(record.Code, info, 0&, 0&)
         End If
