@@ -158,11 +158,14 @@ Public Function Signature(ByVal el As Element) As String
     ElseIf el.IsSharedCellElement Then
         Signature = el.AsSharedCellElement.Name
     ElseIf Not el.IsEllipseElement Then
-        If el.LineStyleSource = msdValueSourceLevel Then
+        Set style = el.LineStyle
+        If style Is Nothing Then Exit Function
+        ' LineStyleSource is restricted in V8i's VBA interface. Resolve the
+        ' explicit ByLevel style through its name instead of that property.
+        If StrComp(style.Name, "ByLevel", vbTextCompare) = 0 Then
             Set lev = el.Level
+            Set style = Nothing
             If Not lev Is Nothing Then Set style = lev.ElementLineStyle
-        Else
-            Set style = el.LineStyle
         End If
         ' Older/external drawings may not resolve a style object. Keep the
         ' element available for manual code assignment; never invent a style.

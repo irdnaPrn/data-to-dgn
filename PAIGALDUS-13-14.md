@@ -44,6 +44,8 @@ See käsk otsib aktiivsest mudelist ainult tavalisi ja shared-celle nimega `KOOR
 
 Selle paranduse paigaldamiseks uuenda **ElementideEksport.bas**, **clsElementKirje.cls** ja **frmEksport** vormi kood failist `frmEksport.vba.txt`; siis **Debug → Compile** ja salvesta projekt. Klass ja vorm tuleb uuendada koos mooduliga, sest leveli ja elemendi nime hoitakse nüüd kirje küljes.
 
+V8i VBA-s piiratud omadust `LineStyleSource` ei kasutata. `Signature` loeb celli nime või joonestiili; KOORDP erikäsk valib celli nime järgi, mitte ainult leveli `KOORDPUNKT` järgi. Kui projektis need viimased klassi- ja vormiuuendused juba olemas on, piisab selle kompileerimisvea parandamiseks ainult `ElementideEksport.bas` uuendamisest.
+
 Kui toolbox vajab projekti eelnevat laadimist, kasuta nupu all ühte rida, näiteks:
 
 ```text

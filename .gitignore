@@ -3,3 +3,8 @@
 *.tmp
 *.log
 ~$*
+*.dgn
+*ma
+andmed_test.csv
+\tests
+andmed_test_2.csv
